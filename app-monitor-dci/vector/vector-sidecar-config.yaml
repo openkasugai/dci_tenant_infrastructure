@@ -1,0 +1,632 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-sidecar-config
+  namespace: dci
+data:
+  ########################################################################################################################
+  # For serving both endpoints of status and metrics
+  ########################################################################################################################
+  vector.toml: |
+    ### Sources
+    [sources.http_client_status]
+    type = "http_client"
+    endpoint = "http://localhost:80/status"
+    method = "GET"
+    request_headers = { Accept = "application/json" }
+    scrape_interval_secs = 10
+    scrape_timeout_secs = 5
+    decoding.codec = "json"
+
+    [sources.http_client_metrics]
+    type = "http_client"
+    endpoint = "http://localhost:80/metrics"
+    method = "GET"
+    request_headers = { Accept = "application/json" }
+    scrape_interval_secs = 10
+    scrape_timeout_secs = 5
+    decoding.codec = "json"
+    
+    [sources.no_endpoint_tick]
+    type = "exec"
+    # Tick event is intentionally delayed so that it always arrives
+    # after status/metrics http_client events within the same period.
+    # This design guarantees periodic CR emission even when
+    # one or both endpoints fail to respond.
+    #
+    # Cross-period races are acceptable by design and are monitored
+    # operationally rather than eliminated structurally.
+    command = ["sh", "-c", "sleep 2; echo '{}'"]
+    mode = "scheduled"
+    scheduled.exec_interval_secs = 10
+    decoding.codec = "json"
+
+    ### Tagging
+    [transforms.tag_status_data]
+    type = "remap"
+    inputs = ["http_client_status"]
+    source = '''
+    .data_type = "status"
+    '''
+
+    [transforms.tag_metrics_data]
+    type = "remap"
+    inputs = ["http_client_metrics"]
+    source = '''
+    .data_type = "metrics"
+    '''
+
+    [transforms.tag_tick_data]
+    type = "remap"
+    inputs = ["no_endpoint_tick"]
+    source = '''
+    .data_source = "tick"
+    .pod_uid = get_env_var!("POD_UID")
+    del(.command)
+    del(.host)
+    del(.pid)
+    del(.source_type)
+    del(.stream)
+    del(.timestamp)
+    del(.timestamp_end)
+    '''
+
+    ### Transform
+    [transforms.transform_status_to_cr]
+    type = "remap"
+    inputs = ["tag_status_data"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    status_info = .
+
+    del(status_info.data_type)
+    del(status_info.source_type)
+    del(status_info.timestamp)
+
+    . = {
+      "pod_uid": get_env_var!("POD_UID"),
+      "data_source": "status",
+      "status_info": status_info
+    }
+    '''
+
+    [transforms.transform_metrics_to_cr]
+    type = "remap"
+    inputs = ["tag_metrics_data"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    metrics_info = .
+
+    del(metrics_info.data_type)
+    del(metrics_info.source_type)
+    del(metrics_info.timestamp)
+
+    . = {
+      "pod_uid": get_env_var!("POD_UID"),
+      "data_source": "metrics",
+      "metrics_info": metrics_info
+    }
+    '''
+
+    ### Reduce
+    [transforms.create_unified_event]
+    type = "reduce"
+    inputs = ["transform_status_to_cr", "transform_metrics_to_cr","tag_tick_data"]
+    group_by = ["pod_uid"]
+    merge_strategies.status_info = "retain"
+    merge_strategies.metrics_info = "retain"
+    starts_when = '.data_source == "tick"'
+    flush_period_ms = 3000
+    max_events = 3
+
+    ### Final CR structure
+    [transforms.final_cr_structure]
+    type = "remap"
+    inputs = ["create_unified_event"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    .metadata = {
+      "uid": get_env_var!("POD_UID"),
+      "name": get_env_var!("POD_NAME"),
+      "namespace": get_env_var!("POD_NAMESPACE")
+    }
+
+    .spec = {
+      "type": get_env_var!("POD_APP_LABEL")
+    }
+
+    status_data = if exists(.status_info) {
+      .status_info
+    } else {
+      { "error": "This value could not be retrieved." }
+    }
+
+    metrics_data = if exists(.metrics_info) {
+      .metrics_info
+    } else {
+      { "error": "This value could not be retrieved." }
+    }
+
+    .status = {
+      "appStatus": {
+        "status": status_data,
+        "metrics": metrics_data,
+        "metas": {}
+      }
+    }
+
+    del(.pod_uid)
+    del(.data_source)
+    del(.status_info)
+    del(.metrics_info)
+    '''
+
+    ### Sink
+    [sinks.argoevents_trigger_event]
+    type = "http"
+    inputs = ["final_cr_structure"]
+    uri = "http://vector-webhook-eventsource-svc.argo-events.svc.cluster.local:12001/vector-temporal-trigger"
+    method = "post"
+    encoding.codec = "json"
+    framing.method = "newline_delimited"
+
+    [sinks.argoevents_trigger_event.healthcheck]
+    enabled = true
+    
+    [sinks.final_cr_structure_dropped_log]
+    type = "console"
+    inputs = ["final_cr_structure.dropped"]
+    encoding.codec = "json"
+
+    [sinks.remap_dropped_log]
+    type = "console"
+    inputs = [
+      "transform_status_to_cr.dropped",
+      "transform_metrics_to_cr.dropped",
+      "final_cr_structure.dropped"
+    ]
+    encoding.codec = "json"
+
+    ### Vector internal API / Health
+    [sinks.argoevents_trigger_event.request]
+    timeout_secs = 4
+    retry_attempts = 1
+    headers = { "Content-Type" = "application/json" }
+
+    ### For Prometheus (standardized, content-agnostic)
+    [sources.prometheus_metrics]
+    type = "prometheus_scrape"
+    endpoints = ["http://localhost:80/metrics/prometheus"]
+
+    [transforms.add_common_metric_tags]
+    type = "remap"
+    inputs = ["prometheus_metrics"]
+    source = '''
+    # metric event -> tags (Prometheus labels)
+    .tags.pod = get_env_var!("POD_NAME")
+    .tags.namespace = get_env_var!("POD_NAMESPACE")
+    .tags.app_type = get_env_var!("POD_APP_LABEL")
+    '''
+
+    [sinks.sink_prometheus]
+    type = "prometheus_exporter"
+    inputs = ["add_common_metric_tags"]
+    address = "0.0.0.0:9588"
+    default_namespace = "dci_app"
+
+    ### Vector internal API / Health
+    [api]
+    enabled = true
+    address = "0.0.0.0:9590"
+
+
+  ########################################################################################################################
+  # For serving only status endpoint (outputs empty value({}) for metrics because metrics endpoint is not served.)
+  ########################################################################################################################
+  vector_status_only.toml: |
+    ### Sources
+    [sources.http_client_status]
+    type = "http_client"
+    endpoint = "http://localhost:80/status"
+    method = "GET"
+    request_headers = { Accept = "application/json" }
+    scrape_interval_secs = 10
+    scrape_timeout_secs = 5
+    decoding.codec = "json"
+
+    [sources.no_endpoint_tick]
+    type = "exec"
+    # Tick event is intentionally delayed so that it always arrives
+    # after status/metrics http_client events within the same period.
+    # This design guarantees periodic CR emission even when
+    # one or both endpoints fail to respond.
+    #
+    # Cross-period races are acceptable by design and are monitored
+    # operationally rather than eliminated structurally.
+    command = ["sh", "-c", "sleep 2; echo '{}'"]
+    mode = "scheduled"
+    scheduled.exec_interval_secs = 10
+    decoding.codec = "json"
+
+    ### Tagging
+    [transforms.tag_status_data]
+    type = "remap"
+    inputs = ["http_client_status"]
+    source = '''
+    .data_type = "status"
+    '''
+
+    [transforms.tag_tick_data]
+    type = "remap"
+    inputs = ["no_endpoint_tick"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    .data_source = "tick"
+    .pod_uid = get_env_var!("POD_UID")
+    del(.command)
+    del(.host)
+    del(.pid)
+    del(.source_type)
+    del(.stream)
+    del(.timestamp)
+    del(.timestamp_end)
+    '''
+
+    ### Transform
+    [transforms.transform_status_to_cr]
+    type = "remap"
+    inputs = ["tag_status_data"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    status_info = .
+
+    del(status_info.data_type)
+    del(status_info.source_type)
+    del(status_info.timestamp)
+
+    . = {
+      "pod_uid": get_env_var!("POD_UID"),
+      "status_info": status_info
+    }
+    '''
+
+    ### Reduce
+    [transforms.create_unified_event]
+    type = "reduce"
+    inputs = ["transform_status_to_cr","tag_tick_data"]
+    group_by = ["pod_uid"]
+    merge_strategies.status_info = "retain"
+    starts_when = '.data_source == "tick"'
+    flush_period_ms = 3000
+    max_events = 2
+
+    ### Final CR structure
+    ### - status: If the status endpoint responds, outputs the return value, if it does'nt respond, outputs "error:xxx"
+    ### - metrics: always empty value({}) 
+    ### - metas  : always empty value({}) 
+    [transforms.final_cr_structure]
+    type = "remap"
+    inputs = ["create_unified_event"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    .metadata = {
+      "uid": get_env_var!("POD_UID"),
+      "name": get_env_var!("POD_NAME"),
+      "namespace": get_env_var!("POD_NAMESPACE")
+    }
+    .spec = { "type": get_env_var!("POD_APP_LABEL") }
+
+    warn_map = { "error": "This value could not be retrieved." }
+
+    status_data = if exists(.status_info) { .status_info } else { warn_map }
+
+    .status = {
+      "appStatus": {
+        "status": status_data,
+        "metrics": {},
+        "metas": {}
+      }
+    }
+
+    del(.pod_uid)
+    del(.status_info)
+    '''
+
+    ### Sink
+    [sinks.argoevents_trigger_event]
+    type = "http"
+    inputs = ["final_cr_structure"]
+    uri = "http://vector-webhook-eventsource-svc.argo-events.svc.cluster.local:12001/vector-temporal-trigger"
+    method = "post"
+    encoding.codec = "json"
+    framing.method = "newline_delimited"
+
+    [sinks.argoevents_trigger_event.healthcheck]
+    enabled = true
+
+    [sinks.argoevents_trigger_event.request]
+    timeout_secs = 4
+    retry_attempts = 1
+    headers = { "Content-Type" = "application/json" }
+
+    [sinks.final_cr_structure_dropped_log]
+    type = "console"
+    inputs = ["final_cr_structure.dropped"]
+    encoding.codec = "json"
+
+    [sinks.remap_dropped_log]
+    type = "console"
+    inputs = [
+      "transform_status_to_cr.dropped",
+      "final_cr_structure.dropped"
+    ]
+    encoding.codec = "json"
+
+    ### Vector internal API / Health
+    [api]
+    enabled = true
+    address = "0.0.0.0:9590"
+
+
+  ########################################################################################################################
+  # For serving only metrics endpoint (outputs empty value({}) for status because status endpoint is not served.)
+  ########################################################################################################################
+  vector_metrics_only.toml: |
+    ### Sources
+    [sources.http_client_metrics]
+    type = "http_client"
+    endpoint = "http://localhost:80/metrics"
+    method = "GET"
+    request_headers = { Accept = "application/json" }
+    scrape_interval_secs = 10
+    scrape_timeout_secs = 5
+    decoding.codec = "json"
+
+    [sources.no_endpoint_tick]
+    type = "exec"
+    # Tick event is intentionally delayed so that it always arrives
+    # after status/metrics http_client events within the same period.
+    # This design guarantees periodic CR emission even when
+    # one or both endpoints fail to respond.
+    #
+    # Cross-period races are acceptable by design and are monitored
+    # operationally rather than eliminated structurally.
+    command = ["sh", "-c", "sleep 2; echo '{}'"]
+    mode = "scheduled"
+    scheduled.exec_interval_secs = 10
+    decoding.codec = "json"
+
+    #[sources.vector_internal_logs]
+    #type = "internal_logs"
+
+    ### Tagging
+    [transforms.tag_metrics_data]
+    type = "remap"
+    inputs = ["http_client_metrics"]
+    source = '''
+    .data_type = "metrics"
+    '''
+
+    [transforms.tag_tick_data]
+    type = "remap"
+    inputs = ["no_endpoint_tick"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    .data_source = "tick"
+    .pod_uid = get_env_var!("POD_UID")
+    del(.command)
+    del(.host)
+    del(.pid)
+    del(.source_type)
+    del(.stream)
+    del(.timestamp)
+    del(.timestamp_end)
+    '''
+
+    ### Transform
+    [transforms.transform_metrics_to_cr]
+    type = "remap"
+    inputs = ["tag_metrics_data"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    metrics_info = .
+
+    del(metrics_info.data_type)
+    del(metrics_info.source_type)
+    del(metrics_info.timestamp)
+
+    . = {
+      "pod_uid": get_env_var!("POD_UID"),
+      "metrics_info": metrics_info
+    }
+    '''
+
+    ### Reduce
+    [transforms.create_unified_event]
+    type = "reduce"
+    inputs = ["transform_metrics_to_cr","tag_tick_data"]
+    group_by = ["pod_uid"]
+    merge_strategies.metrics_info = "retain"
+    starts_when = '.data_source == "tick"'
+    flush_period_ms = 3000
+    max_events = 2
+
+    ### Final CR structure
+    ### - status: always empty value({}) 
+    ### - metrics: If the metrics endpoint responds, outputs the return value, if it does'nt respond, outputs "error:xxx"
+    ### - metas  : always empty value({}) 
+    [transforms.final_cr_structure]
+    type = "remap"
+    inputs = ["create_unified_event"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    .metadata = {
+      "uid": get_env_var!("POD_UID"),
+      "name": get_env_var!("POD_NAME"),
+      "namespace": get_env_var!("POD_NAMESPACE")
+    }
+    .spec = { "type": get_env_var!("POD_APP_LABEL") }
+
+    warn_map = { "error": "This value could not be retrieved." }
+    metrics_data = if exists(.metrics_info) { .metrics_info } else { warn_map }
+
+    .status = {
+      "appStatus": {
+        "status": {},
+        "metrics": metrics_data,
+        "metas": {}
+      }
+    }
+
+    del(.pod_uid)
+    del(.metrics_info)
+    '''
+
+    ### Sink
+    [sinks.argoevents_trigger_event]
+    type = "http"
+    inputs = ["final_cr_structure"]
+    uri = "http://vector-webhook-eventsource-svc.argo-events.svc.cluster.local:12001/vector-temporal-trigger"
+    method = "post"
+    encoding.codec = "json"
+    framing.method = "newline_delimited"
+
+    [sinks.argoevents_trigger_event.healthcheck]
+    enabled = true
+
+    [sinks.argoevents_trigger_event.request]
+    timeout_secs = 4
+    retry_attempts = 1
+    headers = { "Content-Type" = "application/json" }
+
+    [sinks.final_cr_structure_dropped_log]
+    type = "console"
+    inputs = ["final_cr_structure.dropped"]
+    encoding.codec = "json"
+
+    [sinks.remap_dropped_log]
+    type = "console"
+    inputs = [
+      "transform_metrics_to_cr.dropped",
+      "final_cr_structure.dropped"
+    ]
+    encoding.codec = "json"
+
+    ### For Prometheus (standardized, content-agnostic)
+    [sources.prometheus_metrics]
+    type = "prometheus_scrape"
+    endpoints = ["http://localhost:80/metrics/prometheus"]
+
+    [transforms.add_common_metric_tags]
+    type = "remap"
+    inputs = ["prometheus_metrics"]
+    source = '''
+    # metric event -> tags (Prometheus labels)
+    .tags.pod = get_env_var!("POD_NAME")
+    .tags.namespace = get_env_var!("POD_NAMESPACE")
+    .tags.app_type = get_env_var!("POD_APP_LABEL")
+    '''
+
+    [sinks.sink_prometheus]
+    type = "prometheus_exporter"
+    inputs = ["add_common_metric_tags"]
+    address = "0.0.0.0:9588"
+    default_namespace = "dci_app"
+
+
+    ### Vector internal API / Health
+    [api]
+    enabled = true
+    address = "0.0.0.0:9590"
+
+
+  ########################################################################################################################
+  # For serving neither status nor metrics endpoint (outputs empty value({}) for both status and metrics because their endpoints are not served.)
+  ########################################################################################################################
+  vector_no_endpoints.toml: |
+    ### Sources (no endpoints)
+    [sources.no_endpoint_tick]
+    type = "exec"
+    # Tick event is intentionally delayed so that it always arrives
+    # after status/metrics http_client events within the same period.
+    # This design guarantees periodic CR emission even when
+    # one or both endpoints fail to respond.
+    #
+    # Cross-period races are acceptable by design and are monitored
+    # operationally rather than eliminated structurally.
+    command = ["sh", "-c", "sleep 2; echo '{}'"]
+    mode = "scheduled"
+    scheduled.exec_interval_secs = 10
+    decoding.codec = "json"
+
+    [transforms.final_cr_structure_no_endpoints]
+    type = "remap"
+    inputs = ["no_endpoint_tick"]
+    drop_on_error = true
+    reroute_dropped = true
+    source = '''
+    del(.command)
+    del(.host)
+    del(.pid)
+    del(.source_type)
+    del(.stream)
+    del(.timestamp)
+    del(.timestamp_end)
+
+    .metadata = {
+      "uid": get_env_var!("POD_UID"),
+      "name": get_env_var!("POD_NAME"),
+      "namespace": get_env_var!("POD_NAMESPACE")
+    }
+    .spec = { "type": get_env_var!("POD_APP_LABEL") }
+    .status = {
+      "appStatus": {
+        "status": {},
+        "metrics": {},
+        "metas": {}
+      }
+    }
+    '''
+
+    ### Sink
+    [sinks.argoevents_trigger_event]
+    type = "http"
+    inputs = ["final_cr_structure_no_endpoints"]
+    uri = "http://vector-webhook-eventsource-svc.argo-events.svc.cluster.local:12001/vector-temporal-trigger"
+    method = "post"
+    encoding.codec = "json"
+    framing.method = "newline_delimited"
+
+    [sinks.argoevents_trigger_event.healthcheck]
+    enabled = true
+
+    [sinks.argoevents_trigger_event.request]
+    timeout_secs = 4
+    retry_attempts = 1
+    headers = { "Content-Type" = "application/json" }
+
+    [sinks.final_cr_structure_dropped_log]
+    type = "console"
+    inputs = ["final_cr_structure_no_endpoints.dropped"]
+    encoding.codec = "json"
+
+    [sinks.remap_dropped_log]
+    type = "console"
+    inputs = [
+      "final_cr_structure_no_endpoints.dropped"
+    ]
+    encoding.codec = "json"
+
+    ### Vector internal API / Health
+    [api]
+    enabled = true
+    address = "0.0.0.0:9590"

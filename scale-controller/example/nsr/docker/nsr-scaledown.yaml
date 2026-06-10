@@ -1,0 +1,9 @@
+# Scaledown MachineDeployment
+apiVersion: cluster.my.domain/v1alpha1
+kind: NodeScalingRequest
+metadata:
+  namespace: default
+  name: scale-down
+spec:
+  nodeRequestType: delete
+  node: ${NODE_TO_DELETE}

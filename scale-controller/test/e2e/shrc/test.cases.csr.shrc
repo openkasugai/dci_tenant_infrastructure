@@ -1,0 +1,172 @@
+test_cases_csr_basic=(
+    csr_01_test_card_replace
+    csr_02_test_card_add
+    csr_03_test_card_delete
+)
+
+# csr_01_test_card_replace
+# arg1 : scale-controller pod name
+# global variable: cluster_name_w, t_provider_name, dir_script
+# NOTE: This test needs fake-worker-md-00 and worker-dmt-dc1-cots-g1n1, so run this test first.
+csr_01_test_card_replace() {
+    local pod_name_scale_controller=$1
+
+    countup_test_case ${FUNCNAME[0]}
+
+    echo "PARAMETERS:"
+    echo " - WORKLOAD_CLUSTER_NAME     : ${cluster_name_w}"
+    echo " - SCALE_CONTROLLER_POD_NAME : ${pod_name_scale_controller}"
+
+    # collect info before execution
+    get_logs 00_initial ${pod_name_scale_controller}
+
+    # set resource file paths and names for emulation
+    local management_resources_yaml_path="${dir_script}/yaml/${t_provider_name}/cluster-api/fake/management/resources-card-scaling-gpu1.yaml"
+    local workload_resources_yaml_path="${dir_script}/yaml/${t_provider_name}/cluster-api/fake/workload/resources-card-scaling.yaml"
+    local md_name="fake-worker-md-00"
+    local ms_name="fake-worker-ms-00"
+    local machine_name="fake-worker-machine-00"
+    local dm_name="fake-worker-dci-machine-00"
+    local logical_server_name="fake-logical-server-00"
+    local dcimachinetemplate_name="worker-dmt-dc1-cots-g1n1"
+    local node_name="fake-node-00"
+
+    # Set CARD_UUID environment variable for csr-card-replace-template.yaml
+    export CARD_UUID="${gpu_uuid_prefix}-00"
+
+    # Deleting Card
+    echo "Replacing Card started..."
+    # set parameters
+    local csr_name="card-replace"
+    local csr_namespace="default"
+    local yaml_template_path="${dir_script}/yaml/${t_provider_name}/csr/csr-card-replace-template.yaml"
+    # set emulation for dci-manager
+    local emulation_to_scale_down=$(printf "emulate_scaledown_without_deleting_md %s %s %s" \
+        "${management_resources_yaml_path}" \
+        "${workload_resources_yaml_path}" \
+        "${md_name}")
+    local emulation_to_scale_up=$(printf "emulate_scaleup_existing_md %s %s %s %s %s %s %s %s" \
+        "${management_resources_yaml_path}" \
+        "${workload_resources_yaml_path}" \
+        "${md_name}" \
+        "${ms_name}" \
+        "${machine_name}" \
+        "${dm_name}" \
+        "${logical_server_name}" \
+        "${dcimachinetemplate_name}")
+    # execute request
+    card_scaling ${csr_name} ${csr_namespace} ${pod_name_scale_controller} ${yaml_template_path} ${node_name} \
+        "${emulation_to_scale_down}" \
+        "${emulation_to_scale_up}"
+    echo "Replacing Card finished successfully."
+}
+
+# csr_02_test_card_add
+# arg1 : scale-controller pod name
+# global variable: cluster_name_w, t_provider_name, dir_script
+csr_02_test_card_add() {
+    local pod_name_scale_controller=$1
+
+    countup_test_case ${FUNCNAME[0]}
+
+    echo "PARAMETERS:"
+    echo " - WORKLOAD_CLUSTER_NAME     : ${cluster_name_w}"
+    echo " - SCALE_CONTROLLER_POD_NAME : ${pod_name_scale_controller}"
+
+    # collect info before execution
+    get_logs 00_initial ${pod_name_scale_controller}
+
+    # set resource file paths and names for emulation
+    local management_resources_yaml_path="${dir_script}/yaml/${t_provider_name}/cluster-api/fake/management/resources-card-scaling-gpu2.yaml"
+    local workload_resources_yaml_path="${dir_script}/yaml/${t_provider_name}/cluster-api/fake/workload/resources-card-scaling.yaml"
+    local ms_name="fake-worker-ms-00"
+    local machine_name="fake-worker-machine-00"
+    local dm_name="fake-worker-dci-machine-00"
+    local node_name="fake-node-00"
+    local logical_server_name="fake-logical-server-00"
+
+    # get current resources
+    local md_names="$(get_current_md)"
+    local dmt_names="$(get_current_dmt)"
+
+    # Adding Card
+    echo "Adding Card started..."
+    # set parameters
+    local csr_name="card-add"
+    local csr_namespace="default"
+    local yaml_template_path="${dir_script}/yaml/${t_provider_name}/csr/csr-card-add-template.yaml"
+    # set emulation for dci-manager
+    local emulation_to_scale_down=$(printf "emulate_scaledown_with_deleting_md %s %s \"\"" \
+        "${management_resources_yaml_path}" \
+        "${workload_resources_yaml_path}")
+    local emulation_to_scale_up=$(printf "emulate_scaleup_with_new_md %s %s \"%s\" %s %s %s %s \"%s\" \"%s\"" \
+        "${management_resources_yaml_path}" \
+        "${workload_resources_yaml_path}" \
+        "${md_names}" \
+        "${ms_name}" \
+        "${machine_name}" \
+        "${dm_name}" \
+        "${logical_server_name}" \
+        "${dmt_names}" \
+        "")
+    # execute request
+    card_scaling ${csr_name} ${csr_namespace} ${pod_name_scale_controller} ${yaml_template_path} ${node_name} \
+        "${emulation_to_scale_down}" \
+        "${emulation_to_scale_up}"
+    echo "Adding Card finished successfully."
+}
+
+# csr_03_test_card_delete
+# arg1 : scale-controller pod name
+# global variable: cluster_name_w, t_provider_name, dir_script
+csr_03_test_card_delete() {
+    local pod_name_scale_controller=$1
+
+    countup_test_case ${FUNCNAME[0]}
+
+    echo "PARAMETERS:"
+    echo " - WORKLOAD_CLUSTER_NAME     : ${cluster_name_w}"
+    echo " - SCALE_CONTROLLER_POD_NAME : ${pod_name_scale_controller}"
+
+    # collect info before execution
+    get_logs 00_initial ${pod_name_scale_controller}
+
+    # set resource file paths and names for emulation
+    local management_resources_yaml_path="${dir_script}/yaml/${t_provider_name}/cluster-api/fake/management/resources-card-scaling-gpu1.yaml"
+    local workload_resources_yaml_path="${dir_script}/yaml/${t_provider_name}/cluster-api/fake/workload/resources-card-scaling.yaml"
+    local ms_name="fake-worker-ms-00"
+    local machine_name="fake-worker-machine-00"
+    local dm_name="fake-worker-dci-machine-00"
+    local logical_server_name="fake-logical-server-00"
+    local node_name="fake-node-00"
+
+    # get current resources
+    local md_names="$(get_current_md)"
+    local dmt_names="$(get_current_dmt)"
+
+    # Deleting Card
+    echo "Deleting Card started..."
+    # set parameters
+    local csr_name="card-delete"
+    local csr_namespace="default"
+    local yaml_template_path="${dir_script}/yaml/${t_provider_name}/csr/csr-card-delete-template.yaml"
+    # set emulation for dci-manager
+    local emulation_to_scale_down=$(printf "emulate_scaledown_with_deleting_md %s %s \"\"" \
+        "${management_resources_yaml_path}" \
+        "${workload_resources_yaml_path}")
+    local emulation_to_scale_up=$(printf "emulate_scaleup_with_new_md %s %s \"%s\" %s %s %s %s \"%s\" \"%s\"" \
+        "${management_resources_yaml_path}" \
+        "${workload_resources_yaml_path}" \
+        "${md_names}" \
+        "${ms_name}" \
+        "${machine_name}" \
+        "${dm_name}" \
+        "${logical_server_name}" \
+        "${dmt_names}" \
+        "")
+    # execute request
+    card_scaling ${csr_name} ${csr_namespace} ${pod_name_scale_controller} ${yaml_template_path} ${node_name} \
+        "${emulation_to_scale_down}" \
+        "${emulation_to_scale_up}"
+    echo "Deleting Card finished successfully."
+}

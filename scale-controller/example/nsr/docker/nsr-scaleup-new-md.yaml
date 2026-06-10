@@ -1,0 +1,11 @@
+# Scaleup with new MachineDeployment
+apiVersion: cluster.my.domain/v1alpha1
+kind: NodeScalingRequest
+metadata:
+  namespace: default
+  name: scale-up-new-md
+spec:
+  nodeRequestType: create
+  location: new-docker-machine-type
+  serverSpec:
+    type: COTSServer # dummy

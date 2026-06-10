@@ -1,0 +1,212 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: cardscalingrequests.cluster.my.domain
+spec:
+  group: cluster.my.domain
+  names:
+    kind: CardScalingRequest
+    listKind: CardScalingRequestList
+    plural: cardscalingrequests
+    shortNames:
+    - csr
+    singular: cardscalingrequest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.nodeName
+      name: TargetNode
+      type: string
+    - jsonPath: .spec.scalingParameter.op
+      name: Operation
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CardScalingRequest is the Schema for the cardscalingrequests
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CardScalingRequestSpec defines the desired state of CardScalingRequest.
+            properties:
+              nodeName:
+                type: string
+              scalingParameter:
+                description: ScalingParameter defines the parameters for scaling a
+                  card.
+                properties:
+                  model:
+                    description: Model defines the model of the GPU card.
+                    type: string
+                  num:
+                    description: |-
+                      Num defines the number of GPU cards to be added or removed.
+                      When Num is set with "delete", UUIDs must not be set.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  op:
+                    description: Op defines the operation to be performed.
+                    enum:
+                    - add
+                    - delete
+                    - replace
+                    type: string
+                  uuids:
+                    description: |-
+                      UUIDs defines the UUIDs of the GPU cards to be removed or replaced.
+                      When UUIDs is set with "delete", Num must not be set.
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                required:
+                - model
+                - op
+                type: object
+                x-kubernetes-validations:
+                - message: When op is 'add', only 'num' must be set.
+                  rule: self.op != 'add' || (has(self.num) && !has(self.uuids))
+                - message: When op is 'delete', either 'num' or 'uuids' must be set,
+                    but not both.
+                  rule: self.op != 'delete' || ((has(self.num) && !has(self.uuids))
+                    || (!has(self.num) && has(self.uuids)))
+                - message: When op is 'replace', only 'uuids' must be set.
+                  rule: self.op != 'replace' || (!has(self.num) && has(self.uuids))
+            required:
+            - nodeName
+            - scalingParameter
+            type: object
+            x-kubernetes-validations:
+            - message: '`spec` may not be modified after creation.'
+              rule: self == oldSelf
+          status:
+            description: CardScalingRequestStatus defines the observed state of CardScalingRequest.
+            properties:
+              clusterName:
+                description: ClusterName defines the name of the cluster where the
+                  node is located.
+                type: string
+              clusterNamespace:
+                description: ClusterNamespace defines the namespace of the cluster
+                  where the node is located.
+                type: string
+              lastTransitionTime:
+                description: LastTransitionTime is the last time the phase transitioned
+                  to the completed state.
+                format: date-time
+                type: string
+              newDCIMachineInfo:
+                description: NewDCIMachineInfo defines the DCI machine information
+                  after scaling.
+                properties:
+                  dciMachineName:
+                    type: string
+                  dciMachineTemplateName:
+                    type: string
+                  dciMachineTemplateUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                  dciMachineUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                  machineDeploymentName:
+                    type: string
+                  machineDeploymentUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                type: object
+              oldDCIMachineInfo:
+                description: OldDCIMachineInfo defines the DCI machine information
+                  before scaling.
+                properties:
+                  dciMachineName:
+                    type: string
+                  dciMachineTemplateName:
+                    type: string
+                  dciMachineTemplateUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                  dciMachineUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                  machineDeploymentName:
+                    type: string
+                  machineDeploymentUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                type: object
+              phase:
+                description: Phase defines the current phase of the CardScalingRequest.
+                enum:
+                - ""
+                - CardScaleInitializing
+                - DCIMachineTemplateCreating
+                - MachineDeploymentCreating
+                - DCIMachineAnnotating
+                - CardScaleInitialized
+                - NodeScalingDown
+                - NodeScaleDownDeleting
+                - NodeScaleDownCompleted
+                - NodeScalingUp
+                - CardScaleCompleted
+                - NodeScaleDownFailed
+                - NodeScaleUpFailed
+                - DCIMachineTemplateCleanup
+                - MachineDeploymentCleanup
+                - DCIMachineCleanup
+                - CardScaleFinalized
+                - Pending
+                type: string
+            required:
+            - phase
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

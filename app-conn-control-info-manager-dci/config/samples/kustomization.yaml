@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- v1_connectendpoint.yaml
+- v1_dciappstate.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

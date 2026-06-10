@@ -1,0 +1,217 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: dciappconnections.example.com
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  labels:
+  {{- include "chart.labels" . | nindent 4 }}
+spec:
+  group: example.com
+  names:
+    kind: DCIAppConnection
+    listKind: DCIAppConnectionList
+    plural: dciappconnections
+    singular: dciappconnection
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: DCIAppConnection is the Schema for the dciappconnections API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DCIAppConnectionSpec defines the desired state of DCIAppConnection.
+            properties:
+              connections:
+                description: |-
+                  INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                items:
+                  description: Connection defines the desired state of DCIAppConnectionSpec.
+                  properties:
+                    from:
+                      description: Connection defines the desired state of Connection
+                        and ExternalEndpoint.
+                      properties:
+                        deploymentRef:
+                          properties:
+                            name:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - deploymentRef
+                      type: object
+                    to:
+                      description: Connection defines the desired state of Connection
+                        and ExternalEndpoint.
+                      properties:
+                        deploymentRef:
+                          properties:
+                            name:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - deploymentRef
+                      type: object
+                  required:
+                  - from
+                  - to
+                  type: object
+                type: array
+              inputEndpoint:
+                description: |-
+                  DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                  It is currently identical to ExternalEndpoint, keep as an alias to avoid duplicate
+                  struct definitions and to remain compatible with tests that construct
+                  examplecomv1.ExternalEndpoint values.
+                  DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                properties:
+                  externalSubsets:
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                  internal:
+                    description: Connection defines the desired state of Connection
+                      and ExternalEndpoint.
+                    properties:
+                      deploymentRef:
+                        properties:
+                          name:
+                            maxLength: 63
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            maxLength: 63
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                    required:
+                    - deploymentRef
+                    type: object
+                required:
+                - externalSubsets
+                - internal
+                type: object
+              outputEndpoint:
+                description: |-
+                  DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                  It is currently identical to ExternalEndpoint, keep as an alias to avoid duplicate
+                  struct definitions and to remain compatible with tests that construct
+                  examplecomv1.ExternalEndpoint values.
+                  DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                properties:
+                  externalSubsets:
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                  internal:
+                    description: Connection defines the desired state of Connection
+                      and ExternalEndpoint.
+                    properties:
+                      deploymentRef:
+                        properties:
+                          name:
+                            maxLength: 63
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            maxLength: 63
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                    required:
+                    - deploymentRef
+                    type: object
+                required:
+                - externalSubsets
+                - internal
+                type: object
+            required:
+            - connections
+            type: object
+          status:
+            description: DCIAppConnectionStatus defines the observed state of DCIAppConnection.
+            properties:
+              phase:
+                default: ""
+                description: |-
+                  INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+                  Important: Run "make" to regenerate code after modifying this file
+                enum:
+                - Created
+                - Pending
+                - Failed
+                - ""
+                type: string
+            required:
+            - phase
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

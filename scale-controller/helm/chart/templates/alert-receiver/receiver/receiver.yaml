@@ -1,0 +1,67 @@
+{{- if .Values.alertReceiver.enable }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scale-controller-alert-receiver
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+    control-plane: alert-receiver
+spec:
+  replicas:  {{ .Values.alertReceiver.replicas }}
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      control-plane: alert-receiver
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: alert-receiver
+      labels:
+        {{- include "chart.labels" . | nindent 8 }}
+        control-plane: alert-receiver
+        {{- if and .Values.alertReceiver.pod .Values.alertReceiver.pod.labels }}
+        {{- range $key, $value := .Values.alertReceiver.pod.labels }}
+        {{ $key }}: {{ $value }}
+        {{- end }}
+        {{- end }}
+    spec:
+      containers:
+        - name: alert-receiver
+          args:
+            {{- range .Values.alertReceiver.container.args }}
+            - {{ . }}
+            {{- end }}
+          command:
+            - /alert-receiver
+          image: {{ .Values.alertReceiver.container.image.repository }}:{{ .Values.alertReceiver.container.image.tag }}
+          env:
+            {{- range $key, $value := .Values.alertReceiver.container.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.alertReceiver.container.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.alertReceiver.container.readinessProbe | nindent 12 }}
+          ports:
+            - containerPort: 8080
+              name: alert-receiver
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.alertReceiver.container.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.alertReceiver.container.securityContext | nindent 12 }}
+          volumeMounts: []
+      volumes: []
+      securityContext:
+        {{- toYaml .Values.alertReceiver.securityContext | nindent 8 }}
+      serviceAccountName: {{ .Values.alertReceiver.serviceAccountName }}
+      terminationGracePeriodSeconds: {{ .Values.alertReceiver.terminationGracePeriodSeconds }}
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+{{- end -}}

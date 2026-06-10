@@ -1,0 +1,454 @@
+# get current resources
+# arg1 : kubectl alias
+# arg2 : resource type
+get_current_resource() {
+    local kubectl_alias="$1"
+    local resource_type=$2
+    echo "$(${kubectl_alias} get ${resource_type} -o jsonpath='{.items[*].metadata.name}')"
+}
+
+# get added resources from previous resources
+# arg1 : kubectl alias
+# arg2 : resource type
+# arg3 : previous resources
+get_added_resource() {
+    local kubectl_alias="$1"
+    local resource_type=$2
+    local resource_prev="$3"
+    for resource in $(${kubectl_alias} get ${resource_type} -o jsonpath='{.items[*].metadata.name}')
+    do
+        if [[ $(echo ${resource_prev} | grep ${resource} | wc -l) == 0 ]];then
+            echo -n "${resource} "
+        fi
+    done
+}
+
+# get current node names
+# global variable: KUBECTL_W
+get_current_node() {
+    get_current_resource "${KUBECTL_W}" node
+}
+
+# get added node names from previous nodes
+# global variable: KUBECTL_W
+get_added_node() {
+    get_added_resource "${KUBECTL_W}" node "$*"
+}
+
+# get current md names
+# global variable: KUBECTL_M
+get_current_md() {
+    get_current_resource "${KUBECTL_M}" md
+}
+
+# get added md names from previous mds
+# global variable: KUBECTL_M
+get_added_md() {
+    get_added_resource "${KUBECTL_M}" md "$*"
+}
+
+# get current dmt names
+# global variable: KUBECTL_M, t_machine_template_name
+get_current_dmt() {
+    get_current_resource "${KUBECTL_M}" "${t_machine_template_name}"
+}
+
+# get added dmt names from previous dmts
+# global variable: KUBECTL_M, t_machine_template_name
+get_added_dmt() {
+    get_added_resource "${KUBECTL_M}" "${t_machine_template_name}" "$*"
+}
+
+# get current dm names
+# global variable: KUBECTL_M, t_machine_name
+get_current_dm() {
+    get_current_resource "${KUBECTL_M}" "${t_machine_name}"
+}
+
+# get added dm names from previous dms
+# global variable: KUBECTL_M, t_machine_name
+get_added_dm() {
+    get_added_resource "${KUBECTL_M}" "${t_machine_name}" "$*"
+}
+
+# patch md to set status.readyReplicas equal to spec.replicas
+# arg1 : md name
+# global variable: KUBECTL_M
+patch_machine_deployment() {
+    local md_name=$1
+
+    ${KUBECTL_M} patch md ${md_name} --type=merge --subresource status --patch \
+        "{\
+            \"status\": {\
+                \"readyReplicas\": $(${KUBECTL_M} get md ${md_name} -o jsonpath='{.spec.replicas}')\
+            }\
+        }"
+}
+
+# patch ms to set owner reference to md
+# arg1 : ms name
+# arg2 : md name
+# global variable: KUBECTL_M
+patch_machine_set() {
+    local ms_name=$1
+    local md_name=$2
+
+    local md_uid=$(${KUBECTL_M} get md ${md_name} -o jsonpath='{.metadata.uid}')
+    local patch_json=$(printf '[{
+        "op": "add",
+        "path": "/metadata/ownerReferences",
+        "value": [{
+        "apiVersion": "cluster.x-k8s.io/v1beta2",
+        "kind": "MachineDeployment",
+        "name": "%s",
+        "uid": "%s",
+        "controller": true,
+        "blockOwnerDeletion": true}]}]' ${md_name} ${md_uid})
+    ${KUBECTL_M} patch ms ${ms_name} --type='json' -p="${patch_json}"
+}
+
+# patch infra machine to set owner reference to machine and set status
+# arg1 : infra machine name
+# arg2 : machine name
+# arg3 : logical server name
+# global variable: KUBECTL_M, t_machine_name
+patch_infra_machine() {
+    local infra_machine_name=$1
+    local machine_name=$2
+    local logical_server_name=$3
+
+    local machine_uid=$(${KUBECTL_M} get machine ${machine_name} -o jsonpath='{.metadata.uid}')
+    local patch_json=$(printf '[{
+        "op": "add",
+        "path": "/metadata/ownerReferences",
+        "value": [{
+        "apiVersion": "cluster.x-k8s.io/v1beta2",
+        "kind": "Machine",
+        "name": "%s",
+        "uid": "%s",
+        "controller": true,
+        "blockOwnerDeletion": true}]}]' ${machine_name} ${machine_uid})
+    ${KUBECTL_M} patch ${t_machine_name} ${infra_machine_name} --type='json' -p="${patch_json}"
+
+    local patch_json=$(printf '{
+        "status": {
+            "logicalServerRef": {
+                "kind": "LogicalServer",
+                "name": "%s",
+                "namespace": "dcirpm"
+            }
+        }
+    }' ${logical_server_name})
+    ${KUBECTL_M} patch ${t_machine_name} ${infra_machine_name} --type=merge --patch "${patch_json}" --subresource status
+}
+
+# patch logical server to set status
+# arg1 : logical server name
+# arg2 : gpu uuid prefix
+# global variable: KUBECTL_M, gpu_uuid_prefix
+patch_logical_server() {
+    local logical_server_name=$1
+
+    local patch_json='{
+        "status": {
+            "state": "Provisioned",
+            "appliedSpec": {
+                "role": "worker",
+                "type": "ComposedServer",
+                "serverSpec": {
+                    "os": {
+                        "distribution": "rhel",
+                        "version": "9.5"
+                    },
+                    "cpu": 1,
+                    "memory": 1,
+                    "storage": 1,
+                    "nic": {
+                        "model": "Connect-X6",
+                        "num": 1
+                    }
+                }
+            }
+        }
+    }'
+    ${KUBECTL_M} patch logicalserver ${logical_server_name} -n dcirpm --type=merge --patch "${patch_json}" --subresource status
+
+    local gpu_num=$(${KUBECTL_M} get logicalserver ${logical_server_name} -n dcirpm -o jsonpath='{.spec.serverSpec.gpu.num}')
+    if [[ "${gpu_num}" != "" ]];then
+        local patch_json=$(printf '{
+            "status": {
+                "appliedSpec": {
+                    "serverSpec": {
+                        "gpus": [
+                            {
+                                "model": "H100",
+                                "num": %d,
+                                "required": true
+                            }
+                        ]
+                    }
+                }
+            }
+        }' ${gpu_num})
+        ${KUBECTL_M} patch logicalserver ${logical_server_name} -n dcirpm --type=merge --patch "${patch_json}" --subresource status
+
+        for i in $(seq 0 $((gpu_num-1))); do
+            local gpu_uuid=$(printf "%s-%02d" "${gpu_uuid_prefix}" "${i}")
+            local patch_json=$(printf '{
+                "spec": {
+                    "serverSpec": {
+                        "gpu": {
+                            "assignments": [
+                                {
+                                    "uuid": "%s"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }' ${gpu_uuid})
+            ${KUBECTL_M} patch logicalserver ${logical_server_name} -n dcirpm --type=merge --patch "${patch_json}"
+        done
+    fi
+}
+
+# scale up scenario
+# arg1: nsr name
+# arg2: nsr namespace name
+# arg3: scale controller pod name
+# arg4: yaml file path
+# arg5: emulation command
+scaleup() {
+    local nsr_name=$1
+    local nsr_namespace=$2
+    local pod_name_scale_controller=$3
+    local yaml_template_path=$4
+    local emulation=$5
+
+    # create request yaml file
+    echo "Creating yaml file for scaling up request started..."
+    local yaml_path="$(basename ${yaml_template_path%-template.yaml}.yaml)"
+    export NSR_NAME=${nsr_name}
+    export NSR_NAMESPACE=${nsr_namespace}
+    envsubst < ${yaml_template_path} > ${yaml_path}
+    echo "Creating yaml file for scaling up request finished successfully."
+
+    # create request
+    echo "Creating NodeScalingRequest to scale up started..."
+    ${KUBECTL_W} apply -f ${yaml_path}
+    echo "Creating NodeScalingRequest to scale up finished successfully."
+
+    # wait for .status.phase
+    echo "Waiting for NodeScalingRequest to be in Creating phase started..."
+    ${KUBECTL_W} wait nsr --for=jsonpath='{.status.phase}'="Creating" --timeout=600s -n ${nsr_namespace} ${nsr_name}
+    echo "Waiting for NodeScalingRequest to be in Creating phase finished successfully."
+
+    # collect logs
+    echo "Collecting logs after creation of NodeScalingRequest to scale up started..."
+    get_logs 01_scaling_up ${pod_name_scale_controller}
+    echo "Collecting logs after creation of NodeScalingRequest to scale up finished successfully."
+
+    if [[ "$emulation" != "" ]];then
+        # emulate dci-provider
+        eval $emulation
+    fi
+
+    # wait for request finished
+    echo "Waiting for NodeScalingRequest to be in Created phase started..."
+    ${KUBECTL_W} wait nsr --for=jsonpath='{.status.phase}'="Created" --timeout=600s -n ${nsr_namespace} ${nsr_name}
+    echo "Waiting for NodeScalingRequest to be in Created phase finished successfully."
+
+    # collect logs
+    echo "Collecting logs after completion of NodeScalingRequest to scale up started..."
+    get_logs 02_scaled_up ${pod_name_scale_controller}
+    echo "Collecting logs after completion of NodeScalingRequest to scale up finished successfully."
+
+    # delete request
+    echo "Deleting NodeScalingRequest to scale up started..."
+    ${KUBECTL_W} delete nsr ${nsr_name} -n ${nsr_namespace}
+    echo "Deleting NodeScalingRequest to scale up finished successfully."
+}
+
+# scale down scenario
+# arg1: nsr name
+# arg2: nsr namespace name
+# arg3: scale controller pod name
+# arg4: yaml file path
+# arg5: node to delete
+# arg6: emulation command
+scaledown() {
+    local nsr_name=$1
+    local nsr_namespace=$2
+    local pod_name_scale_controller=$3
+    local yaml_template_path=$4
+    local node_to_delete=$5
+    local emulation=$6
+
+    # create request yaml file
+    echo "Creating yaml file for scaling down request started..."
+    local yaml_path="$(basename ${yaml_template_path%-template.yaml}-${node_to_delete}.yaml)"
+    export NSR_NAME=${nsr_name}
+    export NSR_NAMESPACE=${nsr_namespace}
+    export NODE_TO_DELETE=${node_to_delete}
+    envsubst < ${yaml_template_path} > ${yaml_path}
+    echo "Creating yaml file for scaling down request finished successfully."
+
+    # create request
+    echo "Creating NodeScalingRequest to scale down started..."
+    ${KUBECTL_W} apply -f ${yaml_path}
+    echo "Creating NodeScalingRequest to scale down finished successfully."
+
+    # wait for .status.phase
+    echo "Waiting for NodeScalingRequest to be in Deleting phase started..."
+    ${KUBECTL_W} wait nsr --for=jsonpath='{.status.phase}'="Deleting" --timeout=600s -n ${nsr_namespace} ${nsr_name}
+    echo "Waiting for NodeScalingRequest to be in Deleting phase finished successfully."
+
+    # collect logs
+    echo "Collecting logs after creation of NodeScalingRequest to scale down started..."
+    get_logs 03_scaling_down ${pod_name_scale_controller}
+    echo "Collecting logs after creation of NodeScalingRequest to scale down finished successfully."
+
+    if [[ "$emulation" != "" ]];then
+        # emulate dci-provider
+        eval $emulation
+    fi
+
+    # wait for request finished
+    echo "Waiting for NodeScalingRequest to be in Deleted phase started..."
+    ${KUBECTL_W} wait nsr --for=jsonpath='{.status.phase}'="Deleted" --timeout=600s -n ${nsr_namespace} ${nsr_name}
+    echo "Waiting for NodeScalingRequest to be in Deleted phase finished successfully."
+
+    # collect logs
+    echo "Collecting logs after completion of NodeScalingRequest to scale down started..."
+    get_logs 04_scaled_down ${pod_name_scale_controller}
+    echo "Collecting logs after completion of NodeScalingRequest to scale down finished successfully."
+
+    # delete request
+    echo "Deleting NodeScalingRequest to scale down started..."
+    ${KUBECTL_W} delete nsr ${nsr_name} -n ${nsr_namespace}
+    echo "Deleting NodeScalingRequest to scale down finished successfully."
+}
+
+# card scaling scenario
+# arg1: csr name
+# arg2: csr namespace name
+# arg3: scale controller pod name
+# arg4: yaml file path
+# arg5: node name to scale
+# arg6: emulation command to scale down
+# arg7: emulation command to scale up
+card_scaling() {
+    local csr_name=$1
+    local csr_namespace=$2
+    local pod_name_scale_controller=$3
+    local yaml_template_path=$4
+    local node_name=$5
+    local emulation_to_scale_down=$6
+    local emulation_to_scale_up=$7
+
+    # create request yaml file
+    echo "Creating yaml file for card scaling request started..."
+    local yaml_path="$(basename ${yaml_template_path%-template.yaml}.yaml)"
+    export CSR_NAME=${csr_name}
+    export CSR_NAMESPACE=${csr_namespace}
+    export NODE_NAME=${node_name}
+    envsubst < ${yaml_template_path} > ${yaml_path}
+    echo "Creating yaml file for card scaling request finished successfully."
+
+    # create request
+    echo "Creating CardScalingRequest to scale card started..."
+    ${KUBECTL_W} apply -f ${yaml_path}
+    echo "Creating CardScalingRequest to scale card finished successfully."
+
+    # wait for .status.phase
+    echo "Waiting for CardScalingRequest to be in NodeScalingDown phase started..."
+    ${KUBECTL_W} wait cardscalingrequest --for=jsonpath='{.status.phase}'="NodeScalingDown" --timeout=600s -n ${csr_namespace} ${csr_name}
+    echo "Waiting for CardScalingRequest to be in NodeScalingDown phase finished successfully."
+
+    # collect logs
+    echo "Collecting logs after creation of NodeScalingRequest to scale down started..."
+    get_logs 01_csr_scaling_down_node ${pod_name_scale_controller}
+    echo "Collecting logs after creation of NodeScalingRequest to scale down finished successfully."
+
+    # emulate dci-manager
+    if [[ "$emulation_to_scale_down" != "" ]];then
+        # emulate dci-provider
+        eval $emulation_to_scale_down
+    fi
+
+    # wait for request finished
+    echo "Waiting for CardScalingRequest to be in NodeScalingUp phase started..."
+    ${KUBECTL_W} wait cardscalingrequest --for=jsonpath='{.status.phase}'="NodeScalingUp" --timeout=600s -n ${csr_namespace} ${csr_name}
+    echo "Waiting for CardScalingRequest to be in NodeScalingUp phase finished successfully."
+
+    # collect logs
+    echo "Collecting logs after creation of NodeScalingRequest to scale up started..."
+    get_logs 02_csr_scaling_up_node ${pod_name_scale_controller}
+    echo "Collecting logs after creation of NodeScalingRequest to scale up finished successfully."
+
+    # emulate dci-manager
+    if [[ "$emulation_to_scale_up" != "" ]];then
+        # emulate dci-provider
+        eval $emulation_to_scale_up
+    fi
+
+    # wait for request finished
+    echo "Waiting for CardScalingRequest to be in CardScaleCompleted phase started..."
+    ${KUBECTL_W} wait cardscalingrequest --for=jsonpath='{.status.phase}'="CardScaleCompleted" --timeout=600s -n ${csr_namespace} ${csr_name}
+    echo "Waiting for CardScalingRequest to be in CardScaleCompleted phase finished successfully."
+
+    # collect logs
+    echo "Collecting logs after completion of CardScalingRequest to scale card started..."
+    get_logs 03_csr_scale_completed ${pod_name_scale_controller}
+    echo "Collecting logs after completion of CardScalingRequest to scale card finished successfully."
+
+    # delete request
+    echo "Deleting CardScalingRequest to scale card started..."
+    ${KUBECTL_W} delete cardscalingrequest ${csr_name} -n ${csr_namespace}
+    echo "Deleting CardScalingRequest to scale card finished successfully."
+}
+
+# execute tests
+# arg1 : provider name
+# arg2 : log directory path
+# global variable: cluster_name_m, cluster_name_w, test_cases_nsr_basic
+execute_test() {
+    echo "////////////////////////////////////////////////////////////////////////////////"
+    echo "Executing tests started..."
+    echo "--------------------------------------------------------------------------------"
+
+    # Execute
+    check_option_provider $1
+    echo "--------------------------------------------------------------------------------"
+    alias_kubectl
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_create_dummy_resource} == "true" ]]; then
+        create_dummy_resource
+    fi
+    echo "--------------------------------------------------------------------------------"
+
+    echo "Getting scale-controller pod name started..."
+    local pod_name_scale_controller=$(${KUBECTL_W} get pod -n ${namespace} -l control-plane=controller-manager -o jsonpath='{.items[0].metadata.name}')
+    echo "Getting scale-controller pod name finished successfully."
+    echo "--------------------------------------------------------------------------------"
+
+    local case
+    if [[ "${is_exec_nsr_test}" == "true" ]];then
+        for case in ${test_cases_nsr_basic[@]}; do
+            ${case} "${pod_name_scale_controller}"
+            collect_logs $2/${case}
+            echo "--------------------------------------------------------------------------------"
+        done
+    fi
+
+    if [[ "${is_exec_csr_test}" == "true" ]] && [[ "${provider_name}" == "DCI" ]];then
+        for case in ${test_cases_csr_basic[@]}; do
+            ${case} "${pod_name_scale_controller}"
+            collect_logs $2/${case}
+            echo "--------------------------------------------------------------------------------"
+        done
+    fi
+
+    echo "Executing tests finished successfully."
+    echo "////////////////////////////////////////////////////////////////////////////////"
+}

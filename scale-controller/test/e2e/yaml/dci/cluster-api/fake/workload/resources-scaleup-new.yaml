@@ -1,0 +1,12 @@
+# Dummy resources for workload cluster in Workload Cluster are defined here.
+# Node
+apiVersion: v1
+kind: Node
+metadata:
+  name: fake-node-02
+  annotations:
+    cluster.x-k8s.io/cluster-name: ${CLUSTER_NAME}
+    cluster.x-k8s.io/cluster-namespace: default
+    cluster.x-k8s.io/machine: fake-worker-machine-02
+spec:
+  {}

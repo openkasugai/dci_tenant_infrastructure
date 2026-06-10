@@ -1,0 +1,12 @@
+# Card Scaleup
+apiVersion: cluster.my.domain/v1alpha1
+kind: CardScalingRequest
+metadata:
+  namespace: ${CSR_NAMESPACE}
+  name: ${CSR_NAME}
+spec:
+  nodeName: ${NODE_NAME}
+  scalingParameter: 
+    op: add
+    model: H100
+    num: 1

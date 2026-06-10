@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shard-config
+  namespace: temporal
+data:
+  SHARD_COUNT: "3"

@@ -1,0 +1,210 @@
+t_provider_name="docker"
+t_machine_template_name="dockermachinetemplate"
+t_machine_name="dockermachine"
+
+# setup management cluster
+# global variables: cluster_name_m
+setup_management_cluster() {
+    echo "Setting up management cluster started..."
+
+    # Execute
+    echo "Checking target kind cluster(${cluster_name_m}) not to exist started..."
+    if [[ "$(kind get clusters | grep ${cluster_name_m})" == "${cluster_name_m}" ]];then
+        echo "** Management cluster(${cluster_name_m}) may already exist..."
+        echo "** Please change your cluster name or delete existing cluster..."
+        echo "** Setting up management cluster finished with errors."
+        return 1
+    fi
+    echo "Checking target kind cluster(${cluster_name_m}) not to exist finished successfully."
+
+    echo "Creating cluster(${cluster_name_m}) for management cluster by kind started..."
+    kind create cluster -n ${cluster_name_m} \
+        --config ${dir_script}/yaml/docker/kind/kind-cluster-with-extramounts.yaml \
+        2>&1
+    echo "Creating cluster(${cluster_name_m}) for management cluster finished successfully."
+
+    echo "* SLEEP 3s TO WAIT FOR KIND CLUSTER TO BE CREATED *"
+    sleep 3
+
+    echo "Initializing clusterctl for management cluster started..."
+    clusterctl init --infrastructure docker
+    echo "Initializing clusterctl for management cluster finished successfully."
+
+    echo "Waiting for all cluster-api deployments to be ready started..."
+    kubectl --context kind-${cluster_name_m} wait deployment --for=condition=available --timeout=300s -n capi-system capi-controller-manager
+    kubectl --context kind-${cluster_name_m} wait deployment --for=condition=available --timeout=300s -n capi-kubeadm-bootstrap-system capi-kubeadm-bootstrap-controller-manager
+    kubectl --context kind-${cluster_name_m} wait deployment --for=condition=available --timeout=300s -n capi-kubeadm-control-plane-system capi-kubeadm-control-plane-controller-manager
+    kubectl --context kind-${cluster_name_m} wait deployment --for=condition=available --timeout=300s -n capd-system capd-controller-manager
+    echo "Waiting for all cluster-api deployments to be ready finished successfully."
+
+    echo "Setting up management cluster finished successfully."
+}
+
+# setup workload cluster
+# global variables: cluster_name_w
+setup_workload_cluster() {
+    echo "Setting up workload cluster started..."
+
+    # Execute
+    echo "Creating cluster(${cluster_name_w}) for workload cluster by cluster-api started..."
+    export CLUSTER_NAME=${cluster_name_w}
+    # should pull calico image written in below yaml file before executing this script by your hand
+    envsubst < ${dir_script}/yaml/docker/cluster-api/cluster-class-disabled/simple-cluster.yaml | kubectl apply -f -
+    echo "Creating cluster(${cluster_name_w}) for workload cluster by cluster-api finished successfully."
+
+    echo "* SLEEP 3s TO WAIT FOR WORKLOAD CLUSTER TO BE CREATED *"
+    sleep 3
+
+    echo "Waiting for all cluster-api deployments to be ready started..."
+    kubectl --context kind-${cluster_name_m} wait cluster --for=jsonpath='{.status.phase}'=Provisioned --timeout=300s ${cluster_name_w}
+    echo "Waiting for all cluster-api deployments to be ready finished successfully."
+
+    echo "Waiting for secret for workload cluster to be created started..."
+    until kubectl --context kind-${cluster_name_m} get secret ${cluster_name_w}-kubeconfig &>/dev/null; do
+        sleep 1
+    done
+    echo "Waiting for secret for workload cluster to be created finished successfully."
+
+    alias_kubectl
+
+    echo "Getting Machine name for controlplane started..."
+    local controlplane_machine_name=$(${KUBECTL_M} get machine -o json | \
+        jq -r '.items[] | select(.metadata.ownerReferences[]? | .kind=="KubeadmControlPlane") | .metadata.name')
+    echo "Getting Machine name for controlplane finished successfully. (machine_name: ${controlplane_machine_name})"
+
+    echo "Waiting for Machine for controlplane to be running started..."
+    ${KUBECTL_M} wait machine --for=jsonpath='{.status.phase}'=Running --timeout=300s ${controlplane_machine_name}
+    echo "Waiting for Machine for controlplane to be running finished successfully."
+
+    echo "Getting Machine name for worker started..."
+    local worker_machine_name=$(${KUBECTL_M} get machine -o json | \
+        jq -r '.items[] | select(.metadata.ownerReferences[]? | .kind=="MachineSet") | .metadata.name')
+    echo "Getting Machine name for worker finished successfully. (machine_name: ${worker_machine_name})"
+
+    echo "Waiting for Machine for worker to be running started..."
+    ${KUBECTL_M} wait machine --for=jsonpath='{.status.phase}'=Running --timeout=300s ${worker_machine_name}
+    echo "Waiting for Machine for worker to be running finished successfully."
+
+    echo "Deploying Calico network plugin into workload cluster started..."
+    ${KUBECTL_W} apply -f https://raw.githubusercontent.com/projectcalico/calico/${calico_version}/manifests/calico.yaml
+    echo "Deploying Calico network plugin into workload cluster finished successfully."
+
+    echo "Waiting for CoreDNS deployment to be ready started..."
+    ${KUBECTL_W} wait deployment --for=jsonpath='{.status.availableReplicas}'=2 --timeout=300s -n kube-system coredns
+    echo "Waiting for CoreDNS deployment to be ready finished successfully."
+
+    echo "Setting up workload cluster finished successfully."
+}
+
+# set alias for kubectl
+# global variables: KUBECTL_M, KUBECTL_W, cluster_name_m, cluster_name_w
+alias_kubectl() {
+    echo "Setting alias for 'kubectl' started..."
+
+    # Execute
+    if [[ ${KUBECTL_M} == "" ]] && [[ ${cluster_name_m} != "" ]]; then
+        echo "Set context for management cluster: kind-${cluster_name_m}"
+        KUBECTL_M="kubectl --context kind-${cluster_name_m}"
+    fi
+
+    if [[ ${KUBECTL_W} == "" ]] && [[ ${cluster_name_w} != "" ]]; then
+        echo "Getting kubeconfig(${cluster_name_w}.kubeconfig) for workload cluster started..."
+        clusterctl get kubeconfig ${cluster_name_w} > ${dir_execute}/${cluster_name_w}.kubeconfig
+        echo "Getting kubeconfig(${cluster_name_w}.kubeconfig) for workload cluster finished successfully."
+
+        echo "Set kubeconfig path for workload cluster: ${dir_execute}/${cluster_name_w}.kubeconfig"
+        KUBECTL_W="kubectl --kubeconfig ${dir_execute}/${cluster_name_w}.kubeconfig"
+    fi
+
+    # if Proxy enabled, should execute as follows:
+    if [[ ${enable_proxy} == "true" ]]; then
+        echo "Set environment for proxy address(172.18.0.0/16) into NO_PROXY,no_proxy"
+        if [[ $(printenv NO_PROXY | wc -l) == 0 ]];then
+            # if NO_PROXY is not set
+            export NO_PROXY=172.18.0.0/16
+        elif [[ $(printenv NO_PROXY | grep -e '172.18.0.0/16' | wc -l) == 0 ]];then
+            # if NO_PROXY is set, and 172.18.0.0/16 is not set
+            export NO_PROXY=$NO_PROXY,172.18.0.0/16
+        fi
+        if [[ $(printenv no_proxy | wc -l) == 0 ]];then
+            # if no_proxy is not set
+            export no_proxy=172.18.0.0/16
+        elif [[ $(printenv no_proxy | grep -e '172.18.0.0/16' | wc -l) == 0 ]];then
+            # if no_proxy is set, and 172.18.0.0/16 is not set
+            export no_proxy=$no_proxy,172.18.0.0/16
+        fi
+    fi
+
+    echo "Setting alias for 'kubectl' finished successfully."
+}
+
+# Install scale-controller
+# global variables: KUBECTL_W, cluster_name_w, namespace, kubeconfig_file,
+#  scale_controller_image_name, scale_controller_image_tag, MAKE
+install_scale_controller() {
+    echo "Installing scale-controller started..."
+
+    # Execute
+    if [[ ${installer_type} == "kustomize" ]]; then
+        echo "Deploying scale-controller for Docker provider into workload cluster by kustomize started..."
+        if [[ "${is_enabled_debug}" == "true" ]]; then
+            ${MAKE} deploy-docker-debug KUBECTL="${KUBECTL_W}"
+        else
+            ${MAKE} deploy-docker KUBECTL="${KUBECTL_W}"
+        fi
+        echo "Deploying scale-controller for Docker provider into workload cluster by kustomize finished successfully."
+
+        echo "Creating management kubeconfig secret in workload cluster started..."
+        ${KUBECTL_W} create secret generic management-kubeconfig -n ${namespace} --from-file kubeconfig=${kubeconfig_file}
+        echo "Creating management kubeconfig secret in workload cluster finished successfully."
+    else
+        echo "Deploying scale-controller for Docker provider into workload cluster by helm started..."
+        ${MAKE} helmchart 2>&1
+        scale_controller_helm_chart_version=$(grep ${dir_repo_top}/dist/chart/Chart.yaml -e 'version:' | awk '{print $2}')
+        helm install scale-controller ${dir_repo_top}/dist/scale-controller-${scale_controller_helm_chart_version//\"/}.tgz \
+            --create-namespace \
+            --namespace ${namespace} \
+            --set controllerManager.container.env.PROVIDER_NAME=Docker \
+            --set controllerManager.container.image.repository=${scale_controller_image_name} \
+            --set controllerManager.container.image.tag=${scale_controller_image_tag} \
+            --set alertReceiver.enable=false \
+            --set-file managementKubeconfig=${kubeconfig_file} \
+            --kubeconfig ${cluster_name_w}.kubeconfig
+    fi
+
+    echo "* SLEEP 3s TO WAIT FOR SCALE-CONTROLLER TO BE CREATED *"
+    sleep 3
+
+    echo "Waiting for scale-controller deployments to be ready started..."
+    ${KUBECTL_W} wait deployment --for=condition=available --timeout=300s -n ${namespace} scale-controller-controller-manager
+    echo "Waiting for scale-controller deployments to be ready finished successfully."
+
+    echo "Installing scale-controller finished successfully."
+}
+
+# cleanup workload cluster
+# global variables: cluster_name_w, KUBECTL_W, installer_type, namespace, MAKE
+cleanup_workload_cluster() {
+    echo "Cleaning up workload cluster started..."
+
+    # Execute
+    if [[ ${installer_type} == "kustomize" ]]; then
+        echo "Undeploying scale-controller from workload cluster by kustomize started..."
+        if [[ "${is_enabled_debug}" == "true" ]]; then
+            ${MAKE} undeploy-docker-debug KUBECTL="${KUBECTL_W}"
+        else
+            ${MAKE} undeploy-docker KUBECTL="${KUBECTL_W}"
+        fi
+        echo "Undeploying scale-controller from workload cluster by kustomize finished successfully."
+    else
+        echo "Undeploying scale-controller from workload cluster by helm started..."
+        helm uninstall scale-controller -n ${namespace} --kubeconfig ${cluster_name_w}.kubeconfig
+        echo "Undeploying scale-controller from workload cluster by helm finished successfully."
+    fi
+
+    echo "Deleting workload cluster(${cluster_name_w}) started..."
+    kubectl delete cluster ${cluster_name_w}
+    echo "Deleting workload cluster(${cluster_name_w}) finished successfully."
+
+    echo "Cleaning up workload cluster finished successfully."
+}

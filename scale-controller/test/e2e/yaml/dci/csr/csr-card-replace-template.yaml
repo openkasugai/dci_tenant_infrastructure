@@ -1,0 +1,13 @@
+# Card exchange
+apiVersion: cluster.my.domain/v1alpha1
+kind: CardScalingRequest
+metadata:
+  namespace: ${CSR_NAMESPACE}
+  name: ${CSR_NAME}
+spec:
+  nodeName: ${NODE_NAME}
+  scalingParameter: 
+    op: replace
+    model: H100
+    uuids:
+    - ${CARD_UUID}

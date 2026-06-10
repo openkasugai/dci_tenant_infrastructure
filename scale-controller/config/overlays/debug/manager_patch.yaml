@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        command:
+        - /dlv
+        args:
+          - "-l=0.0.0.0:2345"
+          - "--headless"
+          - "--api-version=2"
+          - "--continue"
+          - "--accept-multiclient"
+          - "exec"
+          - "/manager"
+          - "--"
+          - --leader-elect
+          - --health-probe-bind-address=:8081
+        livenessProbe:
+          timeoutSeconds: 86400
+        readinessProbe:
+          timeoutSeconds: 86400
+        ports:
+          - containerPort: 2345
+        resources:
+          limits:
+            cpu: 500m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi

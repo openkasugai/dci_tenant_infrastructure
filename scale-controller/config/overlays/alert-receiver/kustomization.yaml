@@ -1,0 +1,4 @@
+resources:
+- ../../default
+# [ALERT RECEIVER] To enable AlertReceiver for AlertManager from Prometheus, uncomment the following section.
+- ../../alert-receiver

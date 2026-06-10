@@ -1,0 +1,24 @@
+diff -ruN a/charts/cassandra/templates/pdb.yaml b/charts/cassandra/templates/pdb.yaml
+--- a/charts/cassandra/templates/pdb.yaml	2026-04-17 15:53:51.158535336 +0900
++++ b/charts/cassandra/templates/pdb.yaml	2026-04-16 19:49:33.459209047 +0900
+@@ -1,5 +1,5 @@
+ {{- if .Values.podDisruptionBudget -}}
+-apiVersion: policy/v1beta1
++apiVersion: policy/v1
+ kind: PodDisruptionBudget
+ metadata:
+   labels:
+diff -ruN a/templates/server-deployment.yaml b/templates/server-deployment.yaml
+--- a/templates/server-deployment.yaml	2026-04-17 15:53:51.157535336 +0900
++++ b/templates/server-deployment.yaml	2026-04-16 19:49:34.604209020 +0900
+@@ -13,6 +13,10 @@
+     {{- include "temporal.resourceLabels" (list $ $service "deployment") | nindent 4 }}
+ spec:
+   replicas: {{ default $.Values.server.replicaCount $serviceValues.replicaCount }}
++  {{- with (default $.Values.server.deploymentStrategy $serviceValues.deploymentStrategy) }}
++  strategy:
++  {{- toYaml . | nindent 4 }}
++  {{- end }}
+   selector:
+     matchLabels:
+       app.kubernetes.io/name: {{ include "temporal.name" $ }}

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dci-app-computation
+  namespace: dci
+  labels:
+    app: computation
+spec:
+  selector:
+    app: computation
+  ports:
+    - name: dci-app-metrics
+      protocol: TCP
+      port: 9588
+      targetPort: 9588
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dci-app-connection
+  namespace: dci
+  labels:
+    app: connection
+spec:
+  selector:
+    app: connection
+  ports:
+    - name: dci-app-metrics
+      protocol: TCP
+      port: 9588
+      targetPort: 9588
+  type: ClusterIP

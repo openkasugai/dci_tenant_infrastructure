@@ -1,0 +1,9 @@
+apiVersion: cluster.my.domain/v1alpha1
+kind: NodeScalingRequest
+metadata:
+  labels:
+    app.kubernetes.io/name: scale-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: nodescalingrequest-sample
+spec:
+  # TODO(user): Add fields here

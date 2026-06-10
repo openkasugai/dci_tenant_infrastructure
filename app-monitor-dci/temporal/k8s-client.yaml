@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: temporal-client
+  namespace: temporal
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      containers:
+        - name: client
+          image: 'localhost/temporal-client:0.3.4'
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TEMPORAL_NAMESPACE
+              value: default
+            - name: TEMPORAL_ADDRESS
+              value: temporal-stack-frontend.temporal.svc.cluster.local:7233
+            - name: SHARD_COUNT
+              valueFrom:
+                configMapKeyRef:
+                  name: shard-config
+                  key: SHARD_COUNT
+                  optional: true

@@ -1,0 +1,94 @@
+# Constants and global variables for scripts in this directory are defined here
+
+# Constants
+namespace="scale-controller-system"
+kubeconfig_file="management.kubeconfig"
+
+# global variables for settings
+## set "true" to enable proxy settings
+enable_proxy="false"
+## path to directory for dci-provider(used only by dci-provider mode)
+dir_dci_provider_top=""
+## path to directory for resource-pool-manager(used only by dci-provider mode)
+dir_rpm_top=""
+## image name for scale-controller
+scale_controller_image_name="localhost/scale-controller"
+## image tag for scale-controller
+scale_controller_image_tag="e2e"
+## image for scale-controller
+scale_controller_image=${scale_controller_image_name}:${scale_controller_image_tag}
+## image name for card-alert-receiver
+card_alert_receiver_image_name="localhost/card-alert-receiver"
+## image tag for card-alert-receiver
+card_alert_receiver_image_tag="e2e"
+## image for card-alert-receiver
+card_alert_receiver_image=${card_alert_receiver_image_name}:${card_alert_receiver_image_tag}
+# prefix for GPU UUID used in logical server
+gpu_uuid_prefix="GPU-UUID"
+# provider name(Docker or DCI)
+provider_name="DCI"
+# installer type(helm or kustomize)
+installer_type="helm"
+# debug mode
+is_enabled_debug="false"
+
+# setup_management_cluster
+is_exec_setup_management_cluster="true"
+# setup_workload_cluster
+is_exec_setup_workload_cluster="true"
+# setup_certification
+is_exec_setup_certification="true"
+# setup_scale_controller_image
+is_exec_setup_scale_controller_image="true"
+# install_cert_manager
+is_exec_install_cert_manager="true"
+# install_scale_controller
+is_exec_install_scale_controller="true"
+
+# create_dummy_resource
+is_exec_create_dummy_resource="true"
+# execute nsr tests
+is_exec_nsr_test="true"
+# execute csr tests
+is_exec_csr_test="true"
+
+# cleanup_workload_cluster
+is_exec_cleanup_workload_cluster="true"
+# cleanup_management_cluster
+is_exec_cleanup_management_cluster="true"
+
+# version of kind image to be installed
+kind_image_version="v1.34.2"
+# version of calico to be installed
+calico_version="v3.31.2"
+# version of cert-manager to be installed
+cert_manager_version="v1.19.2"
+
+# global variables(not set value here, set value in each setup function)
+KUBECTL_M="" ## kubectl for management cluster
+KUBECTL_W="" ## kubectl for workload cluster
+cluster_name_m="" ## cluster name for management cluster
+cluster_name_w="" ## cluster name for workload cluster
+count_test_case=0
+dir_script=""
+dir_repo_top=""
+dir_execute=""
+MAKE=""
+
+# functions to set global variables in this directory
+set_cluster_name_m() {
+    cluster_name_m=$1
+}
+set_cluster_name_w() {
+    cluster_name_w=$1
+}
+set_dir_script() {
+    dir_script=$1
+}
+set_dir_repo_top() {
+    dir_repo_top=$1
+    MAKE="make --no-print-directory -C ${dir_repo_top}"
+}
+set_dir_execute() {
+    dir_execute=$1
+}

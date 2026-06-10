@@ -1,0 +1,79 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pod-gpu-sm-utility-alerts-relative
+  namespace: prometheus # Adjust to the Namespace where KPS is deployed
+  labels:
+    release: prometheus # Adjust to the Helm release name
+spec:
+  groups:
+    - name: pod.gpu.sm.utility.relative
+      rules:
+        # [Prerequisite] kube-state-metrics must be properly deployed and Prometheus must be scraping it.
+        # --- Deployment-Specific Alert Configuration Guide ---
+        #
+        # Please modify the Prometheus query below to target your desired deployment.
+        #
+        # Original query example:
+        # group_left(label_app_kubernetes_io_name) (label_replace(label_replace(kube_pod_labels{namespace="default", label_app_kubernetes_io_name="app-name"}, "exported_namespace", "$1", "namespace", "(.*)"),"exported_pod", "$1", "pod", "(.*)"))
+        #
+        # ▼ How to customize (replace the bolded placeholders):
+        #
+        # 1. `YOUR_LABEL_KEY`:
+        #    Specify the "label name" from your Deployment's `spec.template.metadata.labels`
+        #    that identifies your application.
+        #    Example: `app.kubernetes.io/name` usually converts to `label_app_kubernetes_io_name` in PromQL.
+        #    Example: `app` converts to `label_app`.
+        #
+        # 2. `YOUR_NAMESPACE`:
+        #    Specify the "namespace" where your Deployment is running.
+        #    Example: `my-project`
+        #
+        # 3. `YOUR_LABEL_VALUE`:
+        #    Specify the "label value" corresponding to the `YOUR_LABEL_KEY` in your Deployment.
+        #    Example: If `app: frontend-app`, then use `frontend-app`.
+        #
+        # Final query format:
+        # group_left(YOUR_LABEL_KEY) (label_replace(label_replace(kube_pod_labels{namespace="YOUR_NAMESPACE", YOUR_LABEL_KEY="YOUR_LABEL_VALUE"}, "exported_namespace", "$1", "namespace", "(.*)"),"exported_pod", "$1", "pod", "(.*)"))
+        #
+        # --- End of Guide ---
+      - expr: |-
+          sum(DCGM_FI_PROF_SM_ACTIVE{exported_container!="", exported_pod=~".*", exported_namespace=~".*"}) by (exported_namespace, exported_pod) * 100 * on(exported_namespace, exported_pod)  group_left(label_app_kubernetes_io_name) (label_replace(label_replace(kube_pod_labels{namespace="default", label_app_kubernetes_io_name="app-name"}, "exported_namespace", "$1", "namespace", "(.*)"),"exported_pod", "$1", "pod", "(.*)"))
+        record: pod_gpu_sm_usage_percentage
+      # Critical: The GPU (SM) usage of the Pod exceeds 90%
+      - alert: PodGPUSMUtilityRelativeCritical
+        annotations:
+          description: The GPU sm utilization for this Pod has continuously exceeded 90% over the last 2 minutes.
+          summary: Critical GPU SM Usage Pod {{ $labels.exported_namespace }}/{{ $labels.exported_pod }}
+        expr: pod_gpu_sm_usage_percentage > 90
+        for: 2m # Alert if it persists for 2 minutes
+        labels:
+          severity: Critical
+      # High: The GPU (SM) usage of the Pod exceeds 75% (but is less than Critical)
+      - alert: PodGPUSMUtilityRelativeHigh
+        annotations:
+          description: The GPU sm utilization for this Pod has continuously exceeded 75% over the last 2 minutes.
+          summary: High GPU SM Usage Pod {{ $labels.exported_namespace }}/{{ $labels.exported_pod }}
+        expr: pod_gpu_sm_usage_percentage > 75 and pod_gpu_sm_usage_percentage <= 90
+        for: 2m # Alert if it persists for 2 minutes
+        labels:
+          severity: High
+            
+      # Medium: The GPU (SM) usage of the Pod exceeds 50% (but is less than High)
+      - alert: PodGPUSMUtilityRelativeMedium
+        annotations:
+          description: The GPU sm utilization for this Pod has continuously exceeded 50% over the last 2 minutes.
+          summary: Medium GPU SM Usage Pod {{ $labels.exported_namespace }}/{{ $labels.exported_pod }}
+        expr: pod_gpu_sm_usage_percentage > 50 and pod_gpu_sm_usage_percentage <= 75
+        for: 2m # Alert if it persists for 2 minutes
+        labels:
+          severity: Medium
+      # Low: The GPU (SM) usage of the Pod is below 50% (but is less than Medium)
+      - alert: PodGPUSMUtilityRelativeLow
+        annotations:
+          description: The GPU sm utilization for this Pod has been consistently below 50% over the last 5 minutes.
+          summary: Low GPU SM Usage Pod {{ $labels.exported_namespace }}/{{ $labels.exported_pod }}
+        expr: pod_gpu_sm_usage_percentage > 0 and pod_gpu_sm_usage_percentage <= 50
+        for: 2m # Alert if it persists for 2 minutes
+        labels:
+          severity: Low

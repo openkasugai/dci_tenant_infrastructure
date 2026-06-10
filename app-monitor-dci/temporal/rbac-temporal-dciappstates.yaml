@@ -1,0 +1,37 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: temporal-dciappstates-role
+  namespace: dci
+rules:
+- apiGroups:
+  - example.com
+  resources:
+  - dciappstates
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - example.com
+  resources:
+  - dciappstates/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: temporal-dciappstates-rolebinding
+  namespace: dci
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: temporal
+roleRef:
+  kind: Role
+  name: temporal-dciappstates-role
+  apiGroup: rbac.authorization.k8s.io

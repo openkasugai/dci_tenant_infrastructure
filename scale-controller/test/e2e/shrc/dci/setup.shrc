@@ -1,0 +1,189 @@
+t_provider_name="dci"
+t_machine_template_name="dcimachinetemplate"
+t_machine_name="dcimachine"
+
+# setup management cluster
+# global variables: cluster_name_m
+setup_management_cluster() {
+    echo "Setting up management cluster started..."
+
+    # Execute
+    echo "Checking target kind cluster(${cluster_name_m}) not to exist started..."
+    if [[ "$(kind get clusters | grep ${cluster_name_m})" == "${cluster_name_m}" ]];then
+        echo "** Management cluster(${cluster_name_m}) may already exist..."
+        echo "** Please change your cluster name or delete existing cluster..."
+        echo "** Setting up management cluster finished with errors."
+        return 1
+    fi
+    echo "Checking target kind cluster(${cluster_name_m}) not to exist finished successfully."
+
+    echo "Creating cluster(${cluster_name_m}) for management cluster by kind started..."
+    kind create cluster -n ${cluster_name_m} --image=kindest/node:${kind_image_version} 2>&1
+    echo "Creating cluster(${cluster_name_m}) for management cluster finished successfully."
+
+    echo "* SLEEP 3s TO WAIT FOR KIND CLUSTER TO BE CREATED *"
+    sleep 3
+
+    echo "Applying CRDs for Cluster-API and DCI-Manager started..."
+    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/v1.12.0/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
+    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/v1.12.0/config/crd/bases/cluster.x-k8s.io_machines.yaml
+    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/v1.12.0/config/crd/bases/cluster.x-k8s.io_machinesets.yaml
+    kubectl --context kind-${cluster_name_m} apply -f ${dir_dci_provider_top}/config/crd/bases
+    kubectl --context kind-${cluster_name_m} apply -f ${dir_rpm_top}/config/crd/bases
+    echo "Applying CRDs for Cluster-API and DCI-Manager finished successfully."
+
+    echo "Creating Dummy resource for Cluster-API and DCI-Manager in Management Cluster started..."
+    export CLUSTER_NAME=${cluster_name_w}
+    envsubst < ${dir_script}/yaml/dci/cluster-api/fake/management/cluster.yaml | kubectl --context kind-${cluster_name_m} apply -f -
+    KUBECTL_M="kubectl --context kind-${cluster_name_m}"
+    patch_machine_deployment fake-worker-md-00
+    patch_machine_set fake-worker-ms-00 fake-worker-md-00
+    patch_infra_machine fake-worker-dci-machine-00 fake-worker-machine-00 fake-logical-server-00
+    patch_logical_server fake-logical-server-00
+    KUBECTL_M=""
+    echo "Creating Dummy resource for Cluster-API and DCI-Manager in Management Cluster finished successfully."
+
+    echo "Setting up management cluster finished successfully."
+}
+
+# setup workload cluster
+# global variables: cluster_name_w
+setup_workload_cluster() {
+    echo "Setting up workload cluster started..."
+
+    # Execute
+    echo "Checking target kind cluster(${cluster_name_w}) not to exist started..."
+    if [[ "$(kind get clusters | grep ${cluster_name_w})" == "${cluster_name_w}" ]];then
+        echo "** Workload cluster(${cluster_name_w}) may already exist..."
+        echo "** Please change your cluster name or delete existing cluster..."
+        echo "** Setting up workload cluster finished with errors."
+        return 1
+    fi
+    echo "Checking target kind cluster(${cluster_name_w}) not to exist finished successfully."
+
+    echo "Creating cluster(${cluster_name_w}) for workload cluster by kind started..."
+    kind create cluster -n ${cluster_name_w} \
+        --config ${dir_script}/yaml/dci/kind/kind-cluster-with-devicetaintrule-enabled.yaml \
+        2>&1
+    echo "Creating cluster(${cluster_name_w}) for workload cluster finished successfully."
+
+    echo "* SLEEP 3s TO WAIT FOR KIND CLUSTER TO BE CREATED *"
+    sleep 3
+
+    echo "Creating Dummy resource for Cluster-API and DCI-Manager in Workload Cluster started..."
+    export CLUSTER_NAME=${cluster_name_w}
+    envsubst < ${dir_script}/yaml/dci/cluster-api/fake/workload/cluster.yaml | kubectl --context kind-${cluster_name_w} apply -f -
+    echo "Creating Dummy resource for Cluster-API and DCI-Manager in Workload Cluster finished successfully."
+
+    echo "Setting up workload cluster finished successfully."
+}
+
+# set alias for kubectl
+# global variables: KUBECTL_M, KUBECTL_W, cluster_name_m, cluster_name_w
+alias_kubectl() {
+    echo "Setting alias for 'kubectl' started..."
+
+    # Execute
+    if [[ ${KUBECTL_M} == "" ]] && [[ ${cluster_name_m} != "" ]]; then
+        echo "Set context for management cluster: kind-${cluster_name_m}"
+        KUBECTL_M="kubectl --context kind-${cluster_name_m}"
+    fi
+
+    if [[ ${KUBECTL_W} == "" ]] && [[ ${cluster_name_w} != "" ]]; then
+        echo "Set context for workload cluster: kind-${cluster_name_w}"
+        KUBECTL_W="kubectl --context kind-${cluster_name_w}"
+    fi
+
+    # if Proxy enabled, should execute as follows:
+    if [[ ${enable_proxy} == "true" ]]; then
+        echo "Set environment for proxy address(172.18.0.0/16) into NO_PROXY,no_proxy"
+        if [[ $(printenv NO_PROXY | wc -l) == 0 ]];then
+            # if NO_PROXY is not set
+            export NO_PROXY=172.18.0.0/16
+        elif [[ $(printenv NO_PROXY | grep -e '172.18.0.0/16' | wc -l) == 0 ]];then
+            # if NO_PROXY is set, and 172.18.0.0/16 is not set
+            export NO_PROXY=$NO_PROXY,172.18.0.0/16
+        fi
+        if [[ $(printenv no_proxy | wc -l) == 0 ]];then
+            # if no_proxy is not set
+            export no_proxy=172.18.0.0/16
+        elif [[ $(printenv no_proxy | grep -e '172.18.0.0/16' | wc -l) == 0 ]];then
+            # if no_proxy is set, and 172.18.0.0/16 is not set
+            export no_proxy=$no_proxy,172.18.0.0/16
+        fi
+    fi
+
+    echo "Setting alias for 'kubectl' finished successfully."
+}
+
+# Install scale-controller
+# global variables: KUBECTL_W, cluster_name_w, namespace, kubeconfig_file,
+#  scale_controller_image_name, scale_controller_image_tag, MAKE
+install_scale_controller() {
+    echo "Installing scale-controller started..."
+
+    # Execute
+    if [[ ${installer_type} == "kustomize" ]]; then
+        echo "Deploying scale-controller for DCI provider into workload cluster by kustomize started..."
+        if [[ "${is_enabled_debug}" == "true" ]]; then
+            ${MAKE} deploy-debug KUBECTL="${KUBECTL_W}"
+        else
+            ${MAKE} deploy-with-alert-receiver KUBECTL="${KUBECTL_W}"
+        fi
+        echo "Deploying scale-controller for DCI provider into workload cluster by kustomize finished successfully."
+
+        echo "Creating management kubeconfig secret in workload cluster started..."
+        ${KUBECTL_W} create secret generic management-kubeconfig -n ${namespace} --from-file kubeconfig=${kubeconfig_file}
+        echo "Creating management kubeconfig secret in workload cluster finished successfully."        
+    else
+        echo "Deploying scale-controller for DCI provider into workload cluster by helm started..."
+        ${MAKE} helmchart 2>&1
+        scale_controller_helm_chart_version=$(grep ${dir_repo_top}/dist/chart/Chart.yaml -e 'version:' | awk '{print $2}')
+        helm install scale-controller ${dir_repo_top}/dist/scale-controller-${scale_controller_helm_chart_version//\"/}.tgz \
+            --create-namespace \
+            --namespace ${namespace} \
+            --set controllerManager.container.image.repository=${scale_controller_image_name} \
+            --set controllerManager.container.image.tag=${scale_controller_image_tag} \
+            --set alertReceiver.container.image.repository=${card_alert_receiver_image_name} \
+            --set alertReceiver.container.image.tag=${card_alert_receiver_image_tag} \
+            --set-file managementKubeconfig=${kubeconfig_file} \
+            --kube-context kind-${cluster_name_w}
+        echo "Deploying scale-controller for DCI provider into workload cluster by helm finished successfully."
+    fi
+
+    echo "* SLEEP 3s TO WAIT FOR SCALE-CONTROLLER TO BE CREATED *"
+    sleep 3
+
+    echo "Waiting for scale-controller deployments to be ready started..."
+    ${KUBECTL_W} wait deployment --for=condition=available --timeout=300s -n ${namespace} scale-controller-controller-manager
+    echo "Waiting for scale-controller deployments to be ready finished successfully."
+
+    echo "Installing scale-controller finished successfully."
+}
+
+# cleanup workload cluster
+# global variables: cluster_name_w, KUBECTL_W, namespace, MAKE, installer_type, is_enabled_debug
+cleanup_workload_cluster() {
+    echo "Cleaning up workload cluster started..."
+
+    # Execute
+    if [[ ${installer_type} == "kustomize" ]]; then
+        echo "Undeploying scale-controller from workload cluster by kustomize started..."
+        if [[ "${is_enabled_debug}" == "true" ]]; then
+            ${MAKE} undeploy-debug KUBECTL="${KUBECTL_W}"
+        else
+            ${MAKE} undeploy-with-alert-receiver KUBECTL="${KUBECTL_W}"
+        fi
+        echo "Undeploying scale-controller from workload cluster by kustomize finished successfully."
+    else
+        echo "Undeploying scale-controller from workload cluster by helm started..."
+        helm uninstall scale-controller -n ${namespace} --kube-context kind-${cluster_name_w}
+        echo "Undeploying scale-controller from workload cluster by helm finished successfully."
+    fi
+
+    echo "Deleting workload cluster(${cluster_name_w}) started..."
+    kind delete cluster -n ${cluster_name_w} 2>&1
+    echo "Deleting workload cluster(${cluster_name_w}) finished successfully."
+
+    echo "Cleaning up workload cluster finished successfully."
+}

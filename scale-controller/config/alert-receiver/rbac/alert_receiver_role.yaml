@@ -1,0 +1,40 @@
+# The same content is in config/rbac but kept here too
+# because the prefix for resource name defined in kustomization.yaml may differ.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: alert-receiver
+    app.kubernetes.io/managed-by: kustomize
+  name: alert-receiver-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - create

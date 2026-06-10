@@ -1,0 +1,317 @@
+{{- if .Values.crd.enable }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.crd.keep }}
+    "helm.sh/resource-policy": keep
+    {{- end }}
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: nodescalingrequests.cluster.my.domain
+spec:
+  group: cluster.my.domain
+  names:
+    kind: NodeScalingRequest
+    listKind: NodeScalingRequestList
+    plural: nodescalingrequests
+    shortNames:
+    - nsr
+    singular: nodescalingrequest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.nodeRequestType
+      name: Type
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: NodeScalingRequest is the Schema for the nodescalingrequests
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: NodeScalingRequestSpec defines the desired state of NodeScalingRequest.
+            properties:
+              location:
+                description: Location is the location for the logical server base
+                  (required for create requests).
+                type: string
+              node:
+                description: Node is the name of the node to delete (required for
+                  delete requests).
+                type: string
+              nodeRequestType:
+                description: NodeRequestType is the type of scaling request (create
+                  or delete).
+                enum:
+                - create
+                - delete
+                type: string
+              serverSpec:
+                description: ServerSpec contains information for creating a new node
+                  (required for create requests).
+                properties:
+                  gpu:
+                    description: Requested GPU information.
+                    properties:
+                      assignments:
+                        description: Assignments is the list of GPU assignments.
+                        items:
+                          properties:
+                            uuid:
+                              description: UUID is the UUID of GPU.
+                              type: string
+                          required:
+                          - uuid
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - uuid
+                        x-kubernetes-list-type: map
+                      model:
+                        description: Model is the model name of GPU.(e.g, A100, H100,...)
+                        type: string
+                      num:
+                        description: Num is the number of GPUs.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    required:
+                    - model
+                    - num
+                    type: object
+                    x-kubernetes-validations:
+                    - message: serverSpec.gpu.model field is immutable
+                      rule: self.model == oldSelf.model
+                  minCPU:
+                    description: Requested minimum CPU core num.
+                    format: int32
+                    maximum: 99999
+                    minimum: 1
+                    type: integer
+                    x-kubernetes-validations:
+                    - message: serverSpec.minCPU field is immutable
+                      rule: self == oldSelf
+                  minMemory:
+                    description: Requested minimum memory size (in MB).
+                    format: int32
+                    maximum: 99999999
+                    minimum: 1
+                    type: integer
+                    x-kubernetes-validations:
+                    - message: serverSpec.minMemory field is immutable
+                      rule: self == oldSelf
+                  minStorage:
+                    description: Requested minimum storage size (in GB).
+                    format: int32
+                    maximum: 960
+                    minimum: 1
+                    type: integer
+                    x-kubernetes-validations:
+                    - message: serverSpec.minStorage field is immutable
+                      rule: self == oldSelf
+                  nic:
+                    description: Requested NIC information.
+                    properties:
+                      model:
+                        description: Model is the model name of NIC.(e.g, MT2892,...)
+                        type: string
+                      num:
+                        description: Num is the number of NICs.
+                        format: int32
+                        maximum: 1
+                        minimum: 1
+                        type: integer
+                    required:
+                    - model
+                    - num
+                    type: object
+                    x-kubernetes-validations:
+                    - message: serverSpec.nic field is immutable
+                      rule: self == oldSelf
+                  os:
+                    description: Requested OS type.
+                    properties:
+                      distribution:
+                        description: Distribution is the name of OS distribution.(e.g,
+                          rhel, ubuntu,...)
+                        type: string
+                      version:
+                        description: Version is the version of OS.(e.g, 9.5, 24.04,...)
+                        type: string
+                    required:
+                    - distribution
+                    - version
+                    type: object
+                    x-kubernetes-validations:
+                    - message: serverSpec.os field is immutable
+                      rule: self == oldSelf
+                  type:
+                    description: Requested server type.
+                    enum:
+                    - ComposedServer
+                    - COTSServer
+                    - VM
+                    - ComposedServerOrCOTSServer
+                    type: string
+                    x-kubernetes-validations:
+                    - message: serverSpec.type field is immutable
+                      rule: self == oldSelf
+                required:
+                - type
+                type: object
+                x-kubernetes-validations:
+                - message: minCPU must be specified and greater than 0 when serverSpec.type
+                    is 'VM'
+                  rule: self.type != 'VM' || self.minCPU > 0
+                - message: minMemory must be specified and greater than 0 when serverSpec.type
+                    is 'VM'
+                  rule: self.type != 'VM' || self.minMemory > 0
+                - message: minStorage must be specified and greater than 0 when serverSpec.type
+                    is 'VM'
+                  rule: self.type != 'VM' || self.minStorage > 0
+            required:
+            - nodeRequestType
+            type: object
+            x-kubernetes-validations:
+            - message: nodeRequestType is create, but spec.node is set
+              rule: 'self.nodeRequestType == ''create'' ? !has(self.node) : true'
+            - message: nodeRequestType is create, but spec.serverSpec is not set
+              rule: 'self.nodeRequestType == ''create'' ? has(self.serverSpec) : true'
+            - message: nodeRequestType is delete, but spec.node is not set
+              rule: 'self.nodeRequestType == ''delete'' ? has(self.node) : true'
+            - message: nodeRequestType is delete, but spec.serverSpec is set
+              rule: 'self.nodeRequestType == ''delete'' ? !has(self.serverSpec) :
+                true'
+            - message: nodeRequestType is delete, but spec.location is set
+              rule: 'self.nodeRequestType == ''delete'' ? !has(self.location) : true'
+            - message: '`spec` may not be modified after creation.'
+              rule: self == oldSelf
+          status:
+            description: NodeScalingRequestStatus defines the observed state of NodeScalingRequest.
+            properties:
+              clusterName:
+                description: ClusterName is the name of the Cluster resource.
+                type: string
+              clusterNamespace:
+                description: ClusterNamespace is the namespace where the Cluster resource
+                  is located.
+                type: string
+              conditions:
+                description: Conditions represent the state of the NodeScalingRequest.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              desiredReplicas:
+                description: DesiredReplicas is the desired number of replicas after
+                  scaling.
+                format: int32
+                type: integer
+              machineDeploymentName:
+                description: MachineDeploymentName is the name of the MachineDeployment
+                  being scaled.
+                type: string
+              machineDeploymentUID:
+                description: MachineDeploymentUID is the uid of the MachineDeployment
+                  being scaled.
+                type: string
+              phase:
+                default: ""
+                description: Phase is the current phase of the scaling request
+                enum:
+                - ""
+                - Creating
+                - Created
+                - CreateFailed
+                - Deleting
+                - Deleted
+                - DeleteFailed
+                - Pending
+                type: string
+            required:
+            - phase
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end -}}

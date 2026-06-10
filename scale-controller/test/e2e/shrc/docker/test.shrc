@@ -1,0 +1,35 @@
+# emulate provider behavior for docker
+emulate_docker() {
+    echo "* NO NEED TO EMULATE FOR DOCKER PROVIDER *"
+}
+
+# emulate scale up existing md
+emulate_scaleup_existing_md() {
+    emulate_docker
+}
+
+# emulate scale down without deleting md
+emulate_scaledown_without_deleting_md() {
+    emulate_docker
+}
+
+# emulate scale up with creating new md
+emulate_scaleup_with_new_md() {
+    emulate_docker
+}
+
+# emulate scale down with deleting md
+emulate_scaledown_with_deleting_md() {
+    emulate_docker
+}
+
+# create dummy resource
+create_dummy_resource() {
+    echo "Creating dummy resources started..."
+
+    echo "Creating dummy cluster resources into management cluster started..."
+    envsubst < ${dir_script}/yaml/docker/cluster-api/fake/management/resources-not-used.yaml | ${KUBECTL_M} apply -f -
+    echo "Creating dummy cluster resources into management cluster finished successfully."
+
+    echo "Creating dummy resources finished successfully."
+}

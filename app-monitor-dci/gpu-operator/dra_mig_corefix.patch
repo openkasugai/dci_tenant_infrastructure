@@ -1,0 +1,145 @@
+diff --git a/internal/pkg/transformation/dra.go b/internal/pkg/transformation/dra.go
+index e407f74..1b3f5d0 100644
+--- a/internal/pkg/transformation/dra.go
++++ b/internal/pkg/transformation/dra.go
+@@ -22,6 +22,8 @@ import (
+ 	"log/slog"
+ 	"time"
+ 
++	"github.com/NVIDIA/dcgm-exporter/internal/pkg/nvmlprovider"
++
+ 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+ 	"k8s.io/client-go/informers"
+ 	"k8s.io/client-go/tools/cache"
+@@ -140,14 +142,26 @@ func (m *DRAResourceSliceManager) onAddOrUpdate(obj interface{}) {
+ 			profile := getAttrString(attr, "profile")
+ 			migUUID := getAttrString(attr, "uuid")
+ 
++			// Extract GPU instance ID as integer value
++			var gpuInstanceIDStr string
++			info, err := nvmlprovider.Client().GetMIGDeviceInfoByID(migUUID)
++			if err != nil {
++				slog.Debug(fmt.Sprintf("Could not find MIG device info for UUID: %s", migUUID))
++				gpuInstanceIDStr = ""
++			} else {
++				gpuInstanceIDStr = fmt.Sprintf("%d", info.GPUInstanceID)
++				slog.Debug(fmt.Sprintf("Found GPU instance ID: %d", info.GPUInstanceID))
++			}
++
+ 			// Only create MIG device if we have required parent UUID
+ 			if parentUUID != "" {
+ 				m.migDevices[key] = &DRAMigDeviceInfo{
+ 					MIGDeviceUUID: migUUID,
+ 					Profile:       profile,
+ 					ParentUUID:    parentUUID,
++					GPUInstanceID: gpuInstanceIDStr,
+ 				}
+-				slog.Debug(fmt.Sprintf("Added MIG device %s (profile: %s) with parent: %s", migUUID, profile, parentUUID))
++				slog.Debug(fmt.Sprintf("Added MIG device %s (profile: %s, GPUInstanceID: %s) with parent: %s", migUUID, profile, gpuInstanceIDStr, parentUUID))
+ 			} else {
+ 				slog.Debug(fmt.Sprintf("MIG device %s missing parent UUID", migUUID))
+ 			}
+diff --git a/internal/pkg/transformation/kubernetes.go b/internal/pkg/transformation/kubernetes.go
+index 74f9287..e93f56b 100644
+--- a/internal/pkg/transformation/kubernetes.go
++++ b/internal/pkg/transformation/kubernetes.go
+@@ -342,7 +342,50 @@ func (p *PodMapper) Process(metrics collector.MetricsByCounter, deviceInfo devic
+ 					return err
+ 				}
+ 
++				slog.Debug("DRA metric processing",
++					"deviceID", deviceID,
++					"parentUUID", val.GPUUUID,
++					"migProfile", val.MigProfile,
++					"gpuInstanceID", val.GPUInstanceID)
++
+ 				podInfos := deviceToPodsDRA[deviceID]
++				slog.Debug("Initial deviceID lookup", "deviceID", deviceID, "foundPods", len(podInfos))
++
++				// For MIG devices: try composite key lookup first, then parent UUID fallback
++				if len(podInfos) == 0 {
++					if val.GPUInstanceID != "" {
++						// Try composite key : parentUUID+GPUInstanceID
++						compositeKey := fmt.Sprintf("%s+%s", val.GPUUUID, val.GPUInstanceID)
++						compositePods := deviceToPodsDRA[compositeKey]
++						if len(compositePods) > 0 {
++							podInfos = compositePods
++							slog.Debug("Retrieved pod information using composite key lookup",
++								"deviceID", deviceID,
++								"parentUUID", val.GPUUUID,
++								"gpuInstanceID", val.GPUInstanceID,
++								"compositeKey", compositeKey,
++								"podCount", len(podInfos))
++						}
++					}
++
++					// Fallback: try parent UUID mapping if composite key lookup failed
++					if len(podInfos) == 0 {
++						parentUUIDPods := deviceToPodsDRA[val.GPUUUID]
++						if len(parentUUIDPods) > 0 {
++							podInfos = parentUUIDPods
++							slog.Debug("Retrieved pod information using parent UUID fallback",
++								"deviceID", deviceID,
++								"parentUUID", val.GPUUUID,
++								"podCount", len(podInfos))
++						} else {
++							slog.Debug("No pod information found for MIG device",
++								"deviceID", deviceID,
++								"parentUUID", val.GPUUUID,
++								"migProfile", val.MigProfile,
++								"gpuInstanceID", val.GPUInstanceID)
++						}
++					}
++				}
+ 				// For all containers using the GPU, extract and annotate a metric
+ 				// with the container info and the shared GPU label, if it exists.
+ 				// Notably, this will increase the number of unique metrics (i.e. labelsets)
+@@ -508,8 +551,36 @@ func (p *PodMapper) toDeviceToPodsDRA(devicePods *podresourcesapi.ListPodResourc
+ 						}
+ 
+ 						podInfo.DynamicResources = &drInfo
+-						deviceToPodsMap[mappingKey] = append(deviceToPodsMap[mappingKey], podInfo)
+-						processedPods[mappingKey][podContainerKey] = true
++						// For MIG devices, create composite key: parentUUID+GPUInstanceID
++						finalMappingKey := mappingKey  // Default: use parent UUID (original behavior)
++						if migInfo != nil && migInfo.GPUInstanceID != "" {
++							// Create composite key: parentUUID+GPUInstanceID (handles multiple parent GPUs)
++							finalMappingKey = fmt.Sprintf("%s+%s", mappingKey, migInfo.GPUInstanceID)
++							slog.Debug("Using composite key for (parentUUID+GPUInstanceID)",
++								"parentUUID", mappingKey,
++								"profile", migInfo.Profile,
++								"gpuInstanceID", migInfo.GPUInstanceID,
++								"finalMappingKey", finalMappingKey,
++								"pod", podContainerKey)
++						} else if migInfo != nil {
++							// For others : use parent UUID (original behavior)
++							slog.Debug("Using parent UUID as mapping key",
++								"profile", migInfo.Profile,
++								"parentUUID", mappingKey,
++								"finalMappingKey", finalMappingKey,
++								"pod", podContainerKey)
++						}
++
++						if processedPods[finalMappingKey] == nil {
++							processedPods[finalMappingKey] = make(map[string]bool)
++						}
++
++						if processedPods[finalMappingKey][podContainerKey] {
++							continue
++						}
++
++						deviceToPodsMap[finalMappingKey] = append(deviceToPodsMap[finalMappingKey], podInfo)
++						processedPods[finalMappingKey][podContainerKey] = true
+ 					}
+ 				}
+ 			}
+diff --git a/internal/pkg/transformation/types.go b/internal/pkg/transformation/types.go
+index e49b759..bd09974 100644
+--- a/internal/pkg/transformation/types.go
++++ b/internal/pkg/transformation/types.go
+@@ -100,4 +100,5 @@ type DRAMigDeviceInfo struct {
+ 	MIGDeviceUUID string
+ 	Profile       string
+ 	ParentUUID    string
++	GPUInstanceID  string
+ }

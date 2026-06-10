@@ -1,0 +1,4 @@
+resources:
+- alert_receiver_role.yaml
+- alert_receiver_role_binding.yaml
+- alert_receiver_service_account.yaml

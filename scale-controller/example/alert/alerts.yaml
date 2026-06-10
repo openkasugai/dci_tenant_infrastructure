@@ -1,0 +1,50 @@
+# This file is an example of PrometheusRule and AlertmanagerConfig for testing the alerting
+# functionality of the scale controller.
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: example-card-alert
+  namespace: prometheus
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: example
+      rules:
+        - alert: "GPU ECC Double-Bit Error Detected"
+          expr: vector(1) # Expression that always triggers an error
+          for: 0s # Grace period before firing
+          labels:
+            severity: warning
+            namespace: prometheus
+            HostName: gpu-hostname
+            UUID: gpu-uuid
+            modelName: gpu-model-name
+          annotations:
+            text: "This is just a test alert for CardAlert that always fires."
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: always-alert-config
+  namespace: prometheus
+spec:
+  route:
+    receiver: webhook-receiver
+    groupWait: 30s # Wait time for grouping (minimum seems to be 10 seconds)
+    groupInterval: 1m 
+    repeatInterval: 5m # Interval for repeated notifications
+    matchers:
+      - name: severity
+        value: warning
+  receivers:
+    - name: webhook-receiver
+      webhookConfigs:
+        # Need to specify the URL of the alert receiver service in the scale controller system
+        - url: 'http://scale-controller-alert-receiver-service.scale-controller-system.svc:8080/alerts'
+          sendResolved: false
+        # You can also use https://webhook.site/ to test the alerting functionality by changing the URL below to the one issued by https://webhook.site/
+        # - url: '${WEBHOOK_SITE_URL}'
+        #   # Change to the URL issued by https://webhook.site/
+          # sendResolved: false

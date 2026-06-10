@@ -1,0 +1,17 @@
+# Scaleup existing MachineDeployment
+apiVersion: cluster.my.domain/v1alpha1
+kind: NodeScalingRequest
+metadata:
+  namespace: default
+  name: scale-up-existing
+spec:
+  nodeRequestType: create
+  location: dc1
+  serverSpec:
+    type: ComposedServer
+    gpu:
+      model: H100
+      num: 1
+    nic:
+      model: Connect-X6
+      num: 1

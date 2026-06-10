@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: vector-webhook
+  namespace: argo-events
+spec:
+  replicas: 3
+  template:
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        effect: "NoSchedule"
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  eventsource-name: vector-webhook
+              topologyKey: kubernetes.io/hostname
+    container:
+      env:
+        - name: LOG_LEVEL
+          namespace: debug
+  service:
+    ports:
+      - port: 12001
+        targetPort: 12001
+  webhook:
+    vector-temporal-trigger:
+      method: POST
+      endpoint: "/vector-temporal-trigger"
+      port: "12001"

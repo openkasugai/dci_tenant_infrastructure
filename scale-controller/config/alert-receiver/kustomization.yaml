@@ -1,0 +1,13 @@
+# Value of these fields are set in the config/default/kustomization.yaml too.
+namespace: scale-controller-system
+namePrefix: scale-controller-
+
+resources:
+- rbac
+- receiver
+- alert_receiver_service.yaml
+
+patches:
+- path: alert_receiver_receiver_patch.yaml
+  target:
+    kind: Deployment

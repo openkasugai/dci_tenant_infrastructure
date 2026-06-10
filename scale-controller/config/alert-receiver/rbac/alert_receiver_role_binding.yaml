@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: alert-receiver
+    app.kubernetes.io/managed-by: kustomize
+  name: alert-receiver-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alert-receiver-role
+subjects:
+- kind: ServiceAccount
+  name: alert-receiver-sa
+  namespace: system

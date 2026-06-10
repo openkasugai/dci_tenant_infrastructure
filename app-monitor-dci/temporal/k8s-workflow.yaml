@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-workflow
+  namespace: temporal
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      app: temporal-workflow
+  template:
+    metadata:
+      labels:
+        app: temporal-workflow
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values: ["temporal-workflow"]
+              topologyKey: "kubernetes.io/hostname"
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      containers:
+      - name: worker
+        image: 'localhost/temporal-workflow:0.3.4'
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: TEMPORAL_NAMESPACE
+          value: default
+        - name: TEMPORAL_ADDRESS
+          value: temporal-stack-frontend.temporal.svc.cluster.local:7233
+        - name: PROMETHEUS_URL
+          value: "http://para-redundancy-prometheuses-service.prometheus.svc.cluster.local:9090"
+        - name: CPU_UTIL_RANGE
+          value: "5m"
+        - name: RESOURCE_API_VERSION
+          value: "v1"
+        - name: HISTORY_EVENT_THRESHOLD
+          value: "25000"

@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: dci-app-service-monitor
+  namespace: prometheus
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - computation
+          - connection
+  namespaceSelector:
+    any: true
+  endpoints:
+    - port: dci-app-metrics
+      interval: 30s

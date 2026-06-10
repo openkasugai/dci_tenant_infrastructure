@@ -1,0 +1,137 @@
+# emulate scale up existing md
+# arg1: additional resources file path for management cluster
+# arg2: additional resources file path for workload cluster
+# arg3: md_name
+# arg4: ms_name
+# arg5: machine_name
+# arg6: dcimachine_name
+# arg7: logical_server_name
+# arg8: dcimachinetemplate_name
+# global variable: cluster_name_w, KUBECTL_M, KUBECTL_W
+emulate_scaleup_existing_md() {
+    echo "Emulating to create node with existing machine deployment started..."
+
+    local management_resources_yaml_path=$1
+    local workload_resources_yaml_path=$2
+    local md_name=$3
+    local ms_name=$4
+    local machine_name=$5
+    local dcimachine_name=$6
+    local logical_server_name=$7
+    local dcimachinetemplate_name=$8
+
+    # emulate dci-provider
+    export CLUSTER_NAME=${cluster_name_w}
+    export MD_NAME=${md_name}
+    export INFRA_TEMPLATE_NAME=${dcimachinetemplate_name}
+    envsubst < ${workload_resources_yaml_path} | ${KUBECTL_W} apply -f -
+    envsubst < ${management_resources_yaml_path} | ${KUBECTL_M} apply -f -
+    patch_infra_machine ${dcimachine_name} ${machine_name} ${logical_server_name}
+    patch_logical_server ${logical_server_name}
+    patch_machine_deployment ${md_name}
+
+    echo "Emulating to create node with existing machine deployment finished successfully."
+}
+
+# emulate scale down without deleting md
+# arg1: additional resources file path for management cluster
+# arg2: additional resources file path for workload cluster
+# arg3: md_name
+# global variable: cluster_name_w, KUBECTL_M, KUBECTL_W
+emulate_scaledown_without_deleting_md() {
+    echo "Emulating to delete node without deleting md"
+
+    local management_resources_yaml_path=$1
+    local workload_resources_yaml_path=$2
+    local md_name=$3
+
+    # emulate dci-provider
+    export CLUSTER_NAME=${cluster_name_w}
+    envsubst < ${workload_resources_yaml_path} | ${KUBECTL_W} delete --ignore-not-found -f -
+
+    envsubst < ${management_resources_yaml_path} | ${KUBECTL_M} delete --ignore-not-found -f -
+    patch_machine_deployment ${md_name}
+
+    echo "Emulating to delete node without deleting md finished successfully."
+}
+
+# emulate scale up with creating new md
+# arg1: additional resources file path for management cluster
+# arg2: additional resources file path for workload cluster
+# arg3: md_names
+# arg4: ms_name
+# arg5: machine_name
+# arg6: dcimachine_name
+# arg7: logical_server_name
+# arg8: dcimachinetemplate_names
+# arg9: dcimachinetemplate_name
+# global variable: cluster_name_w, KUBECTL_M, KUBECTL_W
+emulate_scaleup_with_new_md() {
+    echo "Emulating to create node with new machine deployment and dci machine template"
+
+    local management_resources_yaml_path=$1
+    local workload_resources_yaml_path=$2
+    local md_names="$3"
+    local ms_name=$4
+    local machine_name=$5
+    local dcimachine_name=$6
+    local logical_server_name=$7
+    local dcimachinetemplate_names=$8
+    local dcimachinetemplate_name=$9
+
+    # get resources added by scaling up
+    local md_name=$(get_added_md "${md_names}")
+    if [[ "${dcimachinetemplate_names}" != "" ]];then
+        dcimachinetemplate_name=$(get_added_dmt "${dcimachinetemplate_names}")
+    fi
+
+    # emulate dci-provider
+    export MD_NAME=${md_name}
+    export CLUSTER_NAME=${cluster_name_w}
+    export INFRA_TEMPLATE_NAME=${dcimachinetemplate_name}
+    envsubst < ${workload_resources_yaml_path} | ${KUBECTL_W} apply -f -
+    envsubst < ${management_resources_yaml_path} | ${KUBECTL_M} apply -f -
+    patch_machine_deployment ${md_name}
+    patch_machine_set ${ms_name} ${md_name}
+    patch_infra_machine ${dcimachine_name} ${machine_name} ${logical_server_name}
+    patch_logical_server ${logical_server_name}
+
+    echo "Emulating to create node with new machine deployment and dci machine template finished successfully."
+}
+
+# emulate scale down with deleting md
+# arg1: additional resources file path for management cluster
+# arg2: additional resources file path for workload cluster
+# args: dcimachinetemplate_name
+# global variable: cluster_name_w, KUBECTL_M, KUBECTL_W
+emulate_scaledown_with_deleting_md() {
+    echo "Emulating deleting node with deleting md"
+
+    local management_resources_yaml_path=$1
+    local workload_resources_yaml_path=$2
+    local dcimachinetemplate_name=$3
+
+    # emulate dci-provider
+    export CLUSTER_NAME=${cluster_name_w}
+    envsubst < ${workload_resources_yaml_path} | ${KUBECTL_W} delete --ignore-not-found -f -
+    if [[ "${dcimachinetemplate_name}" != "" ]];then
+        ${KUBECTL_M} delete dcimachinetemplate ${dcimachinetemplate_name} --ignore-not-found
+    fi
+
+    envsubst < ${management_resources_yaml_path} | ${KUBECTL_M} delete --ignore-not-found -f -
+
+    echo "Emulating deleting node with deleting md finished successfully."
+}
+
+# create dummy resource
+# global variables: KUBECTL_M, KUBECTL_W, cluster_name_w, dir_dci_provider_top, dir_rpm_top, dir_script
+create_dummy_resource() {
+    echo "Creating dummy resources started..."
+
+    echo "Creating dummy cluster resources into management cluster started..."
+    export CLUSTER_NAME=${cluster_name_w}
+    envsubst < ${dir_script}/yaml/dci/cluster-api/fake/management/resources-not-used.yaml | ${KUBECTL_M} apply -f -
+    echo "Creating dummy cluster resources into management cluster finished successfully."
+
+    echo "Creating dummy resources finished successfully."
+}

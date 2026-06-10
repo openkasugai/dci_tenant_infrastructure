@@ -1,0 +1,21 @@
+configs:
+  jetstream:
+     versions:
+       - version: latest
+         natsImage: "docker.io/library/nats:2.10.10"
+         metricsExporterImage: "docker.io/natsio/prometheus-nats-exporter:0.14.0"
+         configReloaderImage: "docker.io/natsio/nats-server-config-reloader:0.14.0"
+         startCommand: "/nats-server"
+controller:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      effect: "NoSchedule"
+webhook:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      effect: "NoSchedule"
+

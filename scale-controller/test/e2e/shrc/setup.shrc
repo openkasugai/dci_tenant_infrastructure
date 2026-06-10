@@ -1,0 +1,277 @@
+
+# check provider and source script
+# arg1: input_provider_name
+# global variables: dir_repo_top, dir_dci_provider_top, dir_rpm_top
+check_option_provider() {
+    echo "Checking provider started..."
+
+    # Set arguments
+    local input_provider_name=$1
+
+    # convert to valid provider name
+    if [[ ${input_provider_name} == "Docker" ]] || [[ ${input_provider_name} == "docker" ]];then
+        provider_name="Docker"
+    elif [[ ${input_provider_name} == "DCI" ]] || [[ ${input_provider_name} == "dci" ]];then
+        provider_name="DCI"
+    fi
+
+    # use provider specific setup script
+    local dir_provider_script=""
+    if [[ ${provider_name} == "Docker" ]];then
+        dir_provider_script="${dir_script}/shrc/docker"
+    elif [[ ${provider_name} == "DCI" ]];then
+        dir_provider_script="${dir_script}/shrc/dci"
+
+        if [[ ${dir_dci_provider_top} == "" ]];then
+            dir_dci_provider_top=$(cd ${dir_repo_top}/..;pwd)/cluster-api-provider-dci
+        fi    
+        if [[ ! -d ${dir_dci_provider_top} ]];then
+            echo "** Not found directory for cluster-api-provider-dci(${dir_dci_provider_top}) "
+            return 1
+        fi
+
+        if [[ ${dir_rpm_top} == "" ]];then
+            dir_rpm_top=$(cd ${dir_repo_top}/..;pwd)/resource-pool-manager
+        fi
+        if [[ ! -d ${dir_rpm_top} ]];then
+            echo "** Not found directory for resource-pool-manager(${dir_rpm_top}) "
+            return 1
+        fi
+    else
+        echo "** Invalid provider name(${input_provider_name})"
+        return 1
+    fi
+
+    echo "PROVIDER: ${provider_name}"
+    local f
+    for f in $(ls ${dir_provider_script}/*.shrc); do
+        echo "Sourcing ${f}"
+        . ${f}
+    done
+
+    echo "Checking provider finished successfully."
+}
+
+# check installer type
+# arg1: installer_type
+check_option_installer() {
+    echo "Checking installer started..."
+
+    # Set arguments
+    local input_installer_type=$1
+    
+    # convert to valid installer type
+    if [[ ${input_installer_type} == "kustomize" ]]; then
+        installer_type="kustomize"
+    elif [[ ${input_installer_type} == "helm" ]]; then
+        installer_type="helm"
+    fi
+    
+    if [[ ${installer_type} != "kustomize" ]] && [[ ${installer_type} != "helm" ]];then
+        echo "** Invalid installer type(${installer_type})"
+        return 1
+    fi
+
+    echo "INSTALLER: ${installer_type}"
+
+    echo "Checking installer finished successfully."
+}
+
+# check installer type
+# arg1: is_enabled_debug
+check_option_debug() {
+    echo "Checking debug setting started..."
+
+    # Set arguments
+    local input_is_enabled_debug=$1
+    
+    # convert to valid installer type
+    if [[ ${installer_type} == "kustomize" ]]; then
+        if [[ ${input_is_enabled_debug} == "true" ]];then
+            echo "DEBUG: enabled"
+            is_enabled_debug="true"
+        else
+            echo "DEBUG: disabled"
+            is_enabled_debug="false"
+        fi
+    elif [[ ${installer_type} == "helm" ]]; then
+        echo "DEBUG: disabled"
+        is_enabled_debug="false"
+    fi
+
+    echo "Checking debug setting finished successfully."
+}
+
+# setup certification for scale controller
+# global variables: kubeconfig_file, KUBECTL_M, cluster_name_m
+setup_certification() {
+    echo "Setting up certification for scale-controller started..."
+
+    # Set arguments
+    local secret_name="scale-controller-tenant-secret"
+
+    # Execute
+    echo "Creating RBAC in management cluster started..."
+    ${KUBECTL_M} apply -f ${dir_script}/yaml/${t_provider_name}/rbac/rbac-in-management-cluster.yaml
+    echo "Creating RBAC in management cluster finished successfully."
+
+    echo "Creating kubeconfig file to access management cluster from workload cluster started..."
+    export SERVER_IP_ADDRESS=$(docker inspect ${cluster_name_m}-control-plane \
+        -f '{{.NetworkSettings.Networks.kind.IPAddress}}')
+    export SERVER_PORT=6443
+    export CA_CRT=$(${KUBECTL_M} get secret ${secret_name} \
+        -o jsonpath='{.data.ca\.crt}')
+    export TOKEN=$(${KUBECTL_M} get secret ${secret_name} \
+        -o jsonpath='{.data.token}' | base64 -d)
+    envsubst < ${dir_script}/yaml/common/rbac/management-cluster-kubeconfig.yaml > ${kubeconfig_file}
+    echo "Creating kubeconfig file to access management cluster from workload cluster finished successfully."
+
+    echo "Setting up certification for scale-controller finished successfully."
+}
+
+# create scale controller image and load it into workload cluster
+# global variables: scale_controller_image, cluster_name_w
+setup_scale_controller_image() {
+    echo "Building and Loading scale controller image(${scale_controller_image},${card_alert_receiver_image}) into workload cluster (${cluster_name_w}) started..."
+
+    # Execute
+    echo "Building scale controller image(${scale_controller_image},${card_alert_receiver_image}) started..."
+    export IMG=${scale_controller_image}
+    export ALERT_RECEIVER_IMG=${card_alert_receiver_image}
+    if [[ "${installer_type}" == "kustomize" ]] && [[ "${is_enabled_debug}" == "true" ]]; then
+        ${MAKE} docker-build-debug 2>&1
+    else
+        ${MAKE} docker-build 2>&1
+    fi
+    echo "Building scale controller image(${scale_controller_image},${card_alert_receiver_image}) finished successfully."
+
+    echo "Loading scale controller image(${scale_controller_image}) into workload cluster (${cluster_name_w}) started..."
+    kind load docker-image -n ${cluster_name_w} ${scale_controller_image} 2>&1
+    echo "Loading scale controller image(${scale_controller_image}) into workload cluster (${cluster_name_w}) finished successfully."
+
+    echo "Loading scale controller image(${card_alert_receiver_image}) into workload cluster (${cluster_name_w}) started..."
+    kind load docker-image -n ${cluster_name_w} ${card_alert_receiver_image} 2>&1
+    echo "Loading scale controller image(${card_alert_receiver_image}) into workload cluster (${cluster_name_w}) finished successfully."
+
+    echo "Building and Loading scale controller image(${scale_controller_image},${card_alert_receiver_image}) into workload cluster (${cluster_name_w}) finished successfully."
+}
+
+# deploy cert-manager into workload cluster
+# global variables: KUBECTL_W
+install_cert_manager() {
+    echo "Installing cert-manager into workload cluster started..."
+
+    # Execute
+    echo "Deploying cert-manager into workload cluster started..."
+    ${KUBECTL_W} apply -f https://github.com/cert-manager/cert-manager/releases/download/${cert_manager_version}/cert-manager.yaml
+    echo "Deploying cert-manager into workload cluster finished successfully."
+
+    echo "* SLEEP 3s TO WAIT FOR CERT-MANAGER DEPLOYMENTS TO BE CREATED *"
+    sleep 3
+
+    echo "Waiting for all cert-manager deployments to be ready started..."
+    ${KUBECTL_W} wait deployment --for=condition=available --timeout=300s -n cert-manager cert-manager
+    ${KUBECTL_W} wait deployment --for=condition=available --timeout=300s -n cert-manager cert-manager-cainjector
+    ${KUBECTL_W} wait deployment --for=condition=available --timeout=300s -n cert-manager cert-manager-webhook
+    echo "Waiting for all cert-manager deployments to be ready finished successfully."
+
+    echo "Installing cert-manager into workload cluster finished successfully."
+}
+
+# cleanup management cluster
+# global variables: cluster_name_m
+cleanup_management_cluster() {
+    echo "Cleaning up management cluster started..."
+
+    # Execute
+    echo "Deleting management cluster(${cluster_name_m}) started..."
+    kind delete cluster -n ${cluster_name_m} 2>&1
+    echo "Deleting management cluster(${cluster_name_m}) finished successfully."
+
+    echo "Cleaning up management cluster finished successfully."
+}
+
+# setup controller from creating kind cluster
+# arg1 : provider_name
+# arg2 : installer_type
+# arg3 : is_enabled_debug
+setup_clusters() {
+    echo "////////////////////////////////////////////////////////////////////////////////"
+    echo "Setting up clusters started..."
+    echo "--------------------------------------------------------------------------------"
+
+    # Execute
+    check_option_provider $1
+    echo "--------------------------------------------------------------------------------"
+    check_option_installer $2
+    echo "--------------------------------------------------------------------------------"
+    check_option_debug $3
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_setup_management_cluster} == "true" ]]; then
+        setup_management_cluster
+        if [[ $? != 0 ]]; then
+            return 1
+        fi
+    fi
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_setup_workload_cluster} == "true" ]]; then
+        setup_workload_cluster
+        if [[ $? != 0 ]]; then
+            cleanup_management_cluster
+            return 1
+        fi
+    fi
+    echo "--------------------------------------------------------------------------------"
+    alias_kubectl
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_setup_certification} == "true" ]]; then
+        setup_certification
+    fi
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_setup_scale_controller_image} == "true" ]]; then
+        setup_scale_controller_image
+    fi
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_install_cert_manager} == "true" ]]; then
+        install_cert_manager
+    fi
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_install_scale_controller} == "true" ]]; then
+        install_scale_controller
+    fi
+    echo "--------------------------------------------------------------------------------"
+
+    echo "Setting up clusters finished successfully."
+    echo "////////////////////////////////////////////////////////////////////////////////"
+}
+
+# cleanup all
+# arg1 : provider_name
+# arg2 : installer_type
+# arg3 : is_enabled_debug
+cleanup_all() {
+    echo "////////////////////////////////////////////////////////////////////////////////"
+    echo "Cleaning up clusters started..."
+    echo "--------------------------------------------------------------------------------"
+
+    # Execute
+    check_option_provider $1
+    echo "--------------------------------------------------------------------------------"
+    check_option_installer $2
+    echo "--------------------------------------------------------------------------------"
+    check_option_debug $3
+    echo "--------------------------------------------------------------------------------"
+    alias_kubectl
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_cleanup_workload_cluster} == "true" ]]; then
+        cleanup_workload_cluster
+    fi
+    echo "--------------------------------------------------------------------------------"
+    if [[ ${is_exec_cleanup_management_cluster} == "true" ]]; then
+        cleanup_management_cluster
+    fi
+    echo "--------------------------------------------------------------------------------"
+
+    echo "Cleaning up clusters finished successfully."
+    echo "////////////////////////////////////////////////////////////////////////////////"
+}

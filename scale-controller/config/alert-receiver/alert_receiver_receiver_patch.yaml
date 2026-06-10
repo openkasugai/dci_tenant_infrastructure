@@ -1,0 +1,19 @@
+# Configure the following section to set namespace for CardAlert resource which is created by AlertReceiver,
+- op: add
+  path: /spec/template/spec/containers/0/env/-
+  value:
+    name: CARD_ALERT_NAMESPACE
+    value: default
+
+# Uncomment and configure the following section to change the listening address and port for AlertReceiver.
+# If you want to change port, please also update the port number in alert_receiver_service.yaml and receiver.yaml.
+# - op: add
+#   path: /spec/template/spec/containers/0/env/-
+#   value:
+#     name: ALERT_RECEIVER_LISTEN_ADDRESS
+#     value: "0.0.0.0"
+# - op: add
+#   path: /spec/template/spec/containers/0/env/-
+#   value:
+#     name: ALERT_RECEIVER_LISTEN_PORT
+#     value: "8080"

@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: alertmanager-temporal-signal-sensor
+  namespace: argo-events
+spec:
+  replicas: 3
+  template:
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        effect: "NoSchedule"
+    serviceAccountName: argo-events-sa
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  sensor-name: alertmanager-temporal-signal-sensor
+              topologyKey: kubernetes.io/hostname
+  dependencies:
+    - name: alertmanager-event-dependency
+      eventSourceName: alertmanager-webhook
+      eventName: alertmanager-temporal-trigger
+  triggers:
+    - template:
+        name: send-temporal-signal-alertmanager-trigger
+        http:
+          url: http://temporal-gateway.temporal.svc.cluster.local:8080/alertmanager-signal
+          payload:
+            - src:
+                dependencyName: alertmanager-event-dependency
+                dataKey: body
+              dest: metadata
+          method: POST
+          headers:
+            Content-Type: application/json

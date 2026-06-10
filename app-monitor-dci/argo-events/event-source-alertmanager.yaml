@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: alertmanager-webhook
+  namespace: argo-events
+spec:
+  replicas: 3
+  template:
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        effect: "NoSchedule"
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  eventsource-name: alertmanager-webhook
+              topologyKey: kubernetes.io/hostname
+    container:
+      env:
+        - name: LOG_LEVEL
+          namespace: debug
+  service:
+    ports:
+      - port: 12002
+        targetPort: 12002
+  webhook:
+    alertmanager-temporal-trigger:
+      method: POST
+      endpoint: "/alertmanager-temporal-trigger"
+      port: "12002"

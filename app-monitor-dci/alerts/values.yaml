@@ -1,0 +1,36 @@
+kube-state-metrics:
+  metricLabelsAllowlist:
+    - pods=[*]
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 3
+    image:
+      tag: v0.30.1
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+    podAntiAffinity: "hard"
+  config:
+    route:
+      routes:
+      - receiver: argo-events
+        matchers:
+          - alertname =~ "PodCpuUsageRelativeCritical|PodCpuUsageRelativeHigh|PodCpuUsageRelativeMedium|PodCpuUsageRelativeLow|PodGPUUtilityRelativeCritical|PodGPUUtilityRelativeHigh|PodGPUUtilityRelativeMedium|PodGPUUtilityRelativeLow|PodGPUSMUtilityRelativeCritical|PodGPUSMUtilityRelativeHigh|PodGPUSMUtilityRelativeMedium|PodGPUSMUtilityRelativeLow|PodGPUGRUtilityRelativeCritical|PodGPUGRUtilityRelativeHigh|PodGPUGRUtilityRelativeMedium|PodGPUGRUtilityRelativeLow|PodGPUMemUtilityRelativeCritical|PodGPUMemUtilityRelativeHigh|PodGPUMemUtilityRelativeMedium|PodGPUMemUtilityRelativeLow"
+        group_by: ['alertname', 'instance', 'severity']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 72h
+    receivers:
+    - name: "null"
+    - name: argo-events
+      webhook_configs:
+        - send_resolved: true
+          url: "http://alertmanager-webhook-eventsource-svc.argo-events.svc.cluster.local:12002/alertmanager-temporal-trigger"
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+    minAvailable: ""

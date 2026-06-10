@@ -1,0 +1,81 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pod-cpu-usage-alerts-relative
+  namespace: prometheus # Adjust to the Namespace where KPS is deployed
+  labels:
+    release: prometheus # Adjust to the Helm release name
+spec:
+  groups:
+    - name: pod.cpu.usage.relative
+      rules:
+        # Calculate the CPU usage for each Pod as a percentage of the CPU requests set for that Pod.
+        # [Important prerequisite] kube-state-metrics must be properly deployed and Prometheus must be scraping it.
+        # CPU requests must be set for the Pod.
+        # --- Deployment-Specific Alert Configuration Guide ---
+        #
+        # Please modify the Prometheus query below to target your desired deployment.
+        #
+        # Original query example:
+        # group_left(label_app_kubernetes_io_name) kube_pod_labels{namespace="default", label_app_kubernetes_io_name="app-name"}
+        #
+        # ▼ How to customize (replace the bolded placeholders):
+        #
+        # 1. `YOUR_LABEL_KEY`:
+        #    Specify the "label name" from your Deployment's `spec.template.metadata.labels`
+        #    that identifies your application.
+        #    Example: `app.kubernetes.io/name` usually converts to `label_app_kubernetes_io_name` in PromQL.
+        #    Example: `app` converts to `label_app`.
+        #
+        # 2. `YOUR_NAMESPACE`:
+        #    Specify the "namespace" where your Deployment is running.
+        #    Example: `my-project`
+        #
+        # 3. `YOUR_LABEL_VALUE`:
+        #    Specify the "label value" corresponding to the `YOUR_LABEL_KEY` in your Deployment.
+        #    Example: If `app: frontend-app`, then use `frontend-app`.
+        #
+        # Final query format:
+        # group_left(YOUR_LABEL_KEY) kube_pod_labels{namespace="YOUR_NAMESPACE", YOUR_LABEL_KEY="YOUR_LABEL_VALUE"}
+        #
+        # --- End of Guide ---
+      - expr: |-
+          ((sum(rate(container_cpu_usage_seconds_total{container!="", container!="POD", pod=~".*", namespace=~".*"}[5m]))by(namespace, pod)/sum(kube_pod_container_resource_limits{resource="cpu", unit="core"})by(namespace, pod))*100)*on(namespace, pod) group_left(label_app_kubernetes_io_name)kube_pod_labels{namespace="default",label_app_kubernetes_io_name="app-name"}
+        record: pod_cpu_usage_percentage
+      # Critical: The CPU usage of the Pod exceeds 90%
+      - alert: PodCpuUsageRelativeCritical
+        annotations:
+          description: The CPU utilization for this Pod has continuously exceeded 90% over the last 2 minutes.
+          summary: Critical CPU Usage Pod {{ $labels.namespace }}/{{ $labels.pod }}
+        expr: pod_cpu_usage_percentage > 90
+        for: 2m # Alert if it persists for 2 minutes
+        labels:
+          severity: Critical
+      # High: The CPU usage of the Pod exceeds 75% (but is less than Critical)
+      - alert: PodCpuUsageRelativeHigh
+        annotations:
+          description: The CPU utilization for this Pod has continuously exceeded 75% over the last 2 minutes.
+          summary: High CPU Usage Pod {{ $labels.namespace }}/{{ $labels.pod }}
+        expr: pod_cpu_usage_percentage > 75 and pod_cpu_usage_percentage <= 90
+        for: 2m # Alert if it persists for 2 minutes
+        labels:
+          severity: High
+            
+      # Medium: The CPU usage of the Pod exceeds 50% (but is less than High)
+      - alert: PodCpuUsageRelativeMedium
+        annotations:
+          description: The CPU utilization for this Pod has continuously exceeded 50% over the last 2 minutes.
+          summary: Medium CPU Usage Pod {{ $labels.namespace }}/{{ $labels.pod }}
+        expr: pod_cpu_usage_percentage > 50 and pod_cpu_usage_percentage <= 75
+        for: 2m # Alert if it persists for 2 minutes
+        labels:
+          severity: Medium
+      # Low: The CPU usage of the Pod is below 50% (but is less than Medium)
+      - alert: PodCpuUsageRelativeLow
+        annotations:
+          description: The CPU utilization for this Pod has been consistently below 50% over the last 5 minutes.
+          summary: Low CPU Usage Pod {{ $labels.namespace }}/{{ $labels.pod }}
+        expr: pod_cpu_usage_percentage > 0 and pod_cpu_usage_percentage <= 50
+        for: 2m # Alert if it persists for 2 minutes
+        labels:
+          severity: Low

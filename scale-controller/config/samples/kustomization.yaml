@@ -1,0 +1,6 @@
+## Append samples of your project ##
+resources:
+- cluster_v1alpha1_nodescalingrequest.yaml
+- cluster_v1alpha1_cardscalingrequest.yaml
+- cluster_v1alpha1_cardalert.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

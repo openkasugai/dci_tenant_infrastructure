@@ -1,0 +1,11 @@
+# Scaleup existing MachineDeployment
+apiVersion: cluster.my.domain/v1alpha1
+kind: NodeScalingRequest
+metadata:
+  namespace: default
+  name: scale-up-existing
+spec:
+  nodeRequestType: create
+  location: worker
+  serverSpec:
+    type: COTSServer # dummy

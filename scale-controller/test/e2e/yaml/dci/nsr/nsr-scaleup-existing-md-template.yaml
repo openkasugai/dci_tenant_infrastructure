@@ -1,0 +1,14 @@
+# Scaleup existing MachineDeployment
+apiVersion: cluster.my.domain/v1alpha1
+kind: NodeScalingRequest
+metadata:
+  namespace: ${NSR_NAMESPACE}
+  name: ${NSR_NAME}
+spec:
+  nodeRequestType: create
+  location: dc1
+  serverSpec:
+    type: ComposedServer
+    gpu:
+      model: H100
+      num: 1

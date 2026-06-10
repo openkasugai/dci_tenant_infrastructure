@@ -1,0 +1,26 @@
+{
+    "namespace": "scale-controller-system",
+    "kubeconfig_file": "management.kubeconfig",
+    "enable_proxy": "false",
+    "dir_dci_provider_top": "",
+    "dir_rpm_top": "",
+    "scale_controller_image_name": "localhost/scale-controller",
+    "scale_controller_image_tag": "e2e",
+
+    "default_provider_name": "DCI",
+    "default_installer_type": "helm",
+    "default_is_enabled_debug": "false",
+
+    "is_exec_setup_management_cluster": "true",
+    "is_exec_setup_workload_cluster": "true",
+    "is_exec_setup_certification": "true",
+    "is_exec_setup_scale_controller_image": "true",
+    "is_exec_install_cert_manager": "true",
+
+    "is_exec_create_dummy_resource": "true",
+    "is_exec_nsr_test": "true",
+    "is_exec_csr_test": "true",
+
+    "is_exec_cleanup_workload_cluster": "true",
+    "is_exec_cleanup_management_cluster": "true"
+}

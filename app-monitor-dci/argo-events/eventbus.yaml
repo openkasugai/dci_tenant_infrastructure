@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+  namespace: argo-events
+spec:
+  jetstream:
+    version: latest
+    replicas: 3
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        effect: "NoSchedule"
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  controller: eventbus-controller
+                  eventbus-name: default
+              topologyKey: kubernetes.io/hostname
+    persistence:
+      storageClassName: nfs-client
+      accessMode: ReadWriteOnce
+      volumeSize: 10Gi
+    streamConfig: |
+      maxAge: 72h
+      replicas: 3
+      maxBytes: 1GB
+      maxMsgs: 1000000
+

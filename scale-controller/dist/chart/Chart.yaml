@@ -1,0 +1,6 @@
+apiVersion: v2
+name: scale-controller
+description: A Helm chart to distribute the project scale-controller
+type: application
+version: v0.3.4
+appVersion: "v0.3.4"

@@ -1,0 +1,138 @@
+# count up test case and print to stdout
+# arg1 : function name
+countup_test_case() {
+    local func_name=$1
+    count_test_case=$((count_test_case+1))
+    echo "* ${func_name}: TEST_CASE[${count_test_case}]"
+}
+
+# get logfile for each resources
+# arg1 : prefix for logfile
+# arg2 : pod name for scale-controller
+# global variables: KUBECTL_M, KUBECTL_W, namespace, t_machine_template_name, t_machine_name
+get_logs() {
+    local prefix=$1
+    local pod_name_scale_controller=$2
+    local management_resource=(
+        machine
+        ms
+        md
+        ${t_machine_template_name}
+        ${t_machine_name}
+    )
+    local workload_resource=(
+        node
+        nodescalingrequest
+        cardscalingrequest
+    )
+
+    local r
+    for r in ${management_resource[@]}; do
+        ${KUBECTL_M} get ${r} -A -o yaml > ${prefix}-management-${r}.yaml
+    done
+    for r in ${workload_resource[@]}; do
+        ${KUBECTL_W} get ${r} -A -o yaml > ${prefix}-workload-${r}.yaml
+    done
+    ${KUBECTL_W} logs -n ${namespace} ${pod_name_scale_controller} > ${prefix}-workload-scale-controller.log
+}
+
+# collect logs and resource yamls for debugging
+# arg1 : target directory
+# global variables: t_machine_template_name, t_machine_name
+collect_logs() {
+    local dir_logs=$1
+
+    # Execute
+    mkdir -p ${dir_logs}
+    find . -maxdepth 1 -type f \
+        -a \( \
+            -name "*-scale-controller.log" \
+            -o -name "*-${t_machine_template_name}.yaml" \
+            -o -name "*-${t_machine_name}.yaml" \
+            -o -name "*-machine.yaml" \
+            -o -name "*-md.yaml" \
+            -o -name "*-ms.yaml" \
+            -o -name "*-node.yaml" \
+            -o -name "*-nodescalingrequest.yaml" \
+            -o -name "*-cardscalingrequest.yaml" \
+            -o -name "*nsr-scaledown*.yaml" \
+            -o -name "*nsr-scaleup*.yaml" \
+            -o -name "*csr-card*.yaml" \
+        \) \
+        -exec mv {} ${dir_logs} \;
+}
+
+# collect logs after all execution
+# arg1 : target directory
+collect_logs_after_all() {
+    local dir_logs=$1
+
+    # Execute
+    mkdir -p ${dir_logs}
+    find . -maxdepth 1 -type f \
+        -a \( \
+            -name "${kubeconfig_file}" \
+        \) \
+        -exec mv {} ${dir_logs} \;
+}
+
+get_config_parameter() {
+    local param_name=$1
+    local default_parameter=$2
+    local config_json_path=$3
+
+    local parameter=$(jq -r ${param_name} ${config_json_path})
+    if [[ ${parameter} == "null" ]]; then
+        parameter=${default_parameter}
+    fi
+    echo ${parameter}
+}
+
+# check_config_json
+check_config_json() {
+    echo "Checking config.json started..."
+
+    local config_json_path=$1
+
+    echo "Checking existence of ${config_json_path} started..."
+    if [[ ! -f "${config_json_path}" ]]; then
+        echo "** 'config.json' not found in ${config_json_path}, use default settings **"
+        return 0
+    fi
+    echo "Checking existence of ${config_json_path} finished successfully."
+
+    echo "Reading ${config_json_path} started..."
+    namespace=$(get_config_parameter '.namespace' "${namespace}" ${config_json_path})
+    kubeconfig_file=$(get_config_parameter '.kubeconfig_file' "${kubeconfig_file}" ${config_json_path})
+    enable_proxy=$(get_config_parameter '.enable_proxy' "${enable_proxy}" ${config_json_path})
+    dir_dci_provider_top=$(get_config_parameter '.dir_dci_provider_top' "${dir_dci_provider_top}" ${config_json_path})
+    dir_rpm_top=$(get_config_parameter '.dir_rpm_top' "${dir_rpm_top}" ${config_json_path})
+    scale_controller_image_name=$(get_config_parameter '.scale_controller_image_name' "${scale_controller_image_name}" ${config_json_path})
+    scale_controller_image_tag=$(get_config_parameter '.scale_controller_image_tag' "${scale_controller_image_tag}" ${config_json_path})
+    scale_controller_image="${scale_controller_image_name}:${scale_controller_image_tag}"
+
+    provider_name=$(get_config_parameter '.default_provider_name' "${provider_name}" ${config_json_path})
+    installer_type=$(get_config_parameter '.default_installer_type' "${installer_type}" ${config_json_path})
+    is_enabled_debug=$(get_config_parameter '.default_is_enabled_debug' "${is_enabled_debug}" ${config_json_path})
+
+    is_exec_setup_management_cluster=$(get_config_parameter '.is_exec_setup_management_cluster' "${is_exec_setup_management_cluster}" ${config_json_path})
+    is_exec_setup_workload_cluster=$(get_config_parameter '.is_exec_setup_workload_cluster' "${is_exec_setup_workload_cluster}" ${config_json_path})
+    is_exec_setup_certification=$(get_config_parameter '.is_exec_setup_certification' "${is_exec_setup_certification}" ${config_json_path})
+    is_exec_setup_scale_controller_image=$(get_config_parameter '.is_exec_setup_scale_controller_image' "${is_exec_setup_scale_controller_image}" ${config_json_path})
+    is_exec_install_cert_manager=$(get_config_parameter '.is_exec_install_cert_manager' "${is_exec_install_cert_manager}" ${config_json_path})
+    is_exec_create_dummy_resource=$(get_config_parameter '.is_exec_create_dummy_resource' "${is_exec_create_dummy_resource}" ${config_json_path})
+
+    is_exec_nsr_test=$(get_config_parameter '.is_exec_nsr_test' "${is_exec_nsr_test}" ${config_json_path})
+    is_exec_csr_test=$(get_config_parameter '.is_exec_csr_test' "${is_exec_csr_test}" ${config_json_path})
+
+    is_exec_cleanup_workload_cluster=$(get_config_parameter '.is_exec_cleanup_workload_cluster' "${is_exec_cleanup_workload_cluster}" ${config_json_path})
+    is_exec_cleanup_management_cluster=$(get_config_parameter '.is_exec_cleanup_management_cluster' "${is_exec_cleanup_management_cluster}" ${config_json_path})
+
+    kind_image_version=$(get_config_parameter '.kind_image_version' "${kind_image_version}" ${config_json_path})
+    calico_version=$(get_config_parameter '.calico_version' "${calico_version}" ${config_json_path})
+    cert_manager_version=$(get_config_parameter '.cert_manager_version' "${cert_manager_version}" ${config_json_path})
+
+    echo "Reading ${config_json_path} finished successfully."
+
+    echo "Checking config.json finished successfully."
+}
