@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -1262,7 +1248,8 @@ var DestinationPodStatus402 = examplecomv1.Destination{
 }
 
 var ExpectedConfigFile101Del = examplecomv1.AppConnectControlInfo{
-	Address: "192.168.0.11",
+	Address:  "192.168.0.11",
+	Services: []examplecomv1.Service{},
 }
 
 var ExpectedConfigFile101 = examplecomv1.AppConnectControlInfo{
@@ -1312,7 +1299,8 @@ var ExpectedConfigFile119 = examplecomv1.AppConnectControlInfo{
 	Address: "192.168.0.11",
 	Services: []examplecomv1.Service{
 		{
-			Label: "dciappstate-11",
+			Label:        "dciappstate-11",
+			Destinations: []examplecomv1.Destination{},
 		},
 	},
 	InputSubsets:  externalInputEndpoint.ExternalSubsets,
@@ -1386,7 +1374,8 @@ var ExpectedConfigFile206 = examplecomv1.AppConnectControlInfo{
 	Address: "192.168.0.11",
 	Services: []examplecomv1.Service{
 		{
-			Label: "dciappstate-20",
+			Label:        "dciappstate-20",
+			Destinations: []examplecomv1.Destination{},
 		},
 	},
 	InputSubsets:  externalInputEndpoint.ExternalSubsets,

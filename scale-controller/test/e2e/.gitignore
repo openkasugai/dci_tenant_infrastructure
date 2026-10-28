@@ -1,0 +1,6 @@
+*.yaml
+*.log
+*.html
+*.kubeconfig
+
+.tmp

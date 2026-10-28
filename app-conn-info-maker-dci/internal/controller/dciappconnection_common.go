@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -42,6 +28,20 @@ import (
 
 var ctrlSetControllerReferenceFunc = ctrl.SetControllerReference
 var jsonUnmarshalFunc = json.Unmarshal
+var runtimeCallerFunc = pkgrt.Caller
+
+func getConditionReady(pstCRPod *corev1.Pod) bool {
+	bReadyFlag := false
+	for _, stCondition := range pstCRPod.Status.Conditions {
+		if stCondition.Type == corev1.PodReady {
+			if stCondition.Status == corev1.ConditionTrue {
+				bReadyFlag = true
+			}
+			break
+		}
+	}
+	return bReadyFlag
+}
 
 func getFinalizerName(
 	rClient client.Client,
@@ -60,12 +60,13 @@ func getFromConnectionInformation(
 	cDeploymentNamespace string,
 	cDCIAppConnectionName string,
 	cDCIAppConnectionNamespace string,
+	arInputSubsets []string,
+	arOutputSubsets []string,
 	bAdditionalProcFlag bool,
 	bPodControllerFlag bool,
 	pstFromPodInfos *examplecomv1.FromPodInfos,
 	iConnIdx int,
 	iIOMode int) (error, bool) {
-
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" DeploymentRef: " + cDeploymentName + "," + cDeploymentNamespace +
@@ -77,13 +78,12 @@ func getFromConnectionInformation(
 	var err error
 	bProcFlag := false
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		// List Get Pod Resource
 		var pstCRDeployment *appsv1.Deployment
 		var pstCRPods *corev1.PodList
 		var bFuncRet bool
-		err, bFuncRet, pstCRDeployment, pstCRPods = getDeploymentList(
+		bFuncRet, pstCRDeployment, pstCRPods, err = getDeploymentList(
 			ctx,
 			rClient,
 			log,
@@ -122,7 +122,7 @@ func getFromConnectionInformation(
 				break
 			}
 		} else {
-			if len(cLabel) <= 0 {
+			if cLabel == "" {
 				if bPodControllerFlag {
 					log.Info(cFuncName + " detected that the value of the dciappconnection label in Deployment resource is empty.")
 					break
@@ -143,7 +143,8 @@ func getFromConnectionInformation(
 						log.Info(cFuncName + " detected that the dciappconnection label does not match DCIAppConnectionCR within Name/Namespace.")
 						break
 					} else {
-						log.Error(err, cFuncName+" detected that the dciappconnection label does not match DCIAppConnectionCR withinName/Namespace. It is not a call from the Pod controller, but a request for additional processing.")
+						log.Error(err, cFuncName+" detected that the dciappconnection label does not match DCIAppConnectionCR within Name/Namespace."+
+							" It is not a call from the Pod controller, but a request for additional processing.")
 						bProcFlag = false
 						break
 					}
@@ -167,6 +168,8 @@ func getFromConnectionInformation(
 			cDeploymentNamespace,
 			cDCIAppConnectionName,
 			cDCIAppConnectionNamespace,
+			arInputSubsets,
+			arOutputSubsets,
 			bAdditionalProcFlag,
 			bPodControllerFlag,
 			pstFromPodInfos,
@@ -199,6 +202,8 @@ func getFromConnectionInformationPod(
 	cDeploymentNamespace string,
 	cDCIAppConnectionName string,
 	cDCIAppConnectionNamespace string,
+	arInputSubsets []string,
+	arOutputSubsets []string,
 	bAdditionalProcFlag bool,
 	bPodControllerFlag bool,
 	pstFromPodInfos *examplecomv1.FromPodInfos,
@@ -220,16 +225,16 @@ func getFromConnectionInformationPod(
 	var bFuncRet bool
 	iPodCnt := 0
 
-	for iPodIdx := 0; len(pstCRPods.Items) > iPodIdx; iPodIdx++ {
-
+	for iPodIdx := range pstCRPods.Items {
 		log.Info(cFuncName + " set FromPod Info. Pod Index: " + strconv.Itoa(len(pstCRPods.Items)))
 
 		stCRPod := pstCRPods.Items[iPodIdx]
 
-		// Check Running Phase
-		if corev1.PodRunning != stCRPod.Status.Phase {
+		// Check Ready
+		bReadyFlag := getConditionReady(&stCRPod)
+		if !bReadyFlag {
 			if !bPodControllerFlag && bAdditionalProcFlag {
-				log.Info(cFuncName + " detected that Pod resource Phase is not Running." +
+				log.Info(cFuncName + " detected that Pod resource Status.Conditions is not Ready." +
 					" Name: " + stCRPod.Name +
 					", Namespace: " + stCRPod.Namespace)
 				bProcFlag = false
@@ -264,7 +269,7 @@ func getFromConnectionInformationPod(
 				log.Info("debug: " + cFuncName + " could not find dciappconnection in the Pod's labels.")
 			}
 		} else {
-			if len(cLabel) <= 0 {
+			if cLabel == "" {
 				if !bAdditionalProcFlag {
 					bHoldFlag = false
 					log.Info("debug: " + cFuncName + " detected that the value of the dciappconnection label in the Pod is empty.")
@@ -283,7 +288,8 @@ func getFromConnectionInformationPod(
 						bHoldFlag = false
 						log.Info("debug: " + cFuncName + " detected that it does not match the value of the dciappconnection label in the Pod.")
 					} else {
-						log.Error(err, cFuncName+" detected that it does not match the value of the dciappconnection label in the Pod. It is not a call from the Pod controller, but a request for additional processing.")
+						log.Error(err, cFuncName+" detected that it does not match the value of the dciappconnection label in the Pod. "+
+							"It is not a call from the Pod controller, but a request for additional processing.")
 						bProcFlag = false
 						break
 					}
@@ -294,6 +300,12 @@ func getFromConnectionInformationPod(
 			var stFromPod examplecomv1.FromPodInfo
 			stFromPod.DeploymentRef.Name = cDeploymentName
 			stFromPod.DeploymentRef.Namespace = cDeploymentNamespace
+			if len(arInputSubsets) != 0 {
+				stFromPod.InputSubsets = arInputSubsets
+			}
+			if len(arOutputSubsets) != 0 {
+				stFromPod.OutputSubsets = arOutputSubsets
+			}
 			stFromPod.DeploymentR = pstCRDeployment
 			stFromPod.PodR = &stCRPod
 			stFromPod.Address = c2ndNicAddress
@@ -316,12 +328,14 @@ func getFromConnectionInformationPod(
 			} else {
 				if !stConnectEndpoint.DeletionTimestamp.IsZero() {
 					if !bPodControllerFlag && bAdditionalProcFlag {
-						log.Info(cFuncName + " detected that ConnectEndpointCR has a DeletionTimestamp. It is not a call from the Pod controller, but a request for additional processing.")
+						log.Info(cFuncName + " detected that ConnectEndpointCR has a DeletionTimestamp. " +
+							"It is not a call from the Pod controller, but a request for additional processing.")
 						bProcFlag = false
 						break
 					}
 					if bPodControllerFlag && bAdditionalProcFlag {
-						log.Info(cFuncName + " detected that ConnectEndpointCR has a DeletionTimestamp. It is a call from the Pod controller, but a request for additional processing.")
+						log.Info(cFuncName + " detected that ConnectEndpointCR has a DeletionTimestamp. " +
+							"It is a call from the Pod controller, but a request for additional processing.")
 						bProcFlag = false
 						break
 					}
@@ -346,6 +360,12 @@ func getFromConnectionInformationPod(
 		var stFromPod examplecomv1.FromPodInfo
 		stFromPod.DeploymentRef.Name = cDeploymentName
 		stFromPod.DeploymentRef.Namespace = cDeploymentNamespace
+		if len(arInputSubsets) != 0 {
+			stFromPod.InputSubsets = arInputSubsets
+		}
+		if len(arOutputSubsets) != 0 {
+			stFromPod.OutputSubsets = arOutputSubsets
+		}
 		stFromPod.DeploymentR = pstCRDeployment
 		stFromPod.IOMode = iIOMode
 		stFromPod.MstPodFlag = true
@@ -371,7 +391,6 @@ func getToConnectionInformation(
 	bPodControllerFlag bool,
 	pstToPodInfos *examplecomv1.ToPodInfos,
 	iConnIdx int) (error, bool) {
-
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" DeploymentRef: " + cDeploymentName + "," + cDeploymentNamespace +
@@ -382,13 +401,12 @@ func getToConnectionInformation(
 	var err error
 	bProcFlag := false
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		// List Get Pod Resource
 		var pstCRDeployment *appsv1.Deployment
 		var pstCRPods *corev1.PodList
 		var bFuncRet bool
-		err, bFuncRet, pstCRDeployment, pstCRPods = getDeploymentList(
+		bFuncRet, pstCRDeployment, pstCRPods, err = getDeploymentList(
 			ctx,
 			rClient,
 			log,
@@ -396,7 +414,7 @@ func getToConnectionInformation(
 			cDeploymentNamespace,
 			bAdditionalProcFlag,
 			bPodControllerFlag)
-		if nil != err {
+		if err != nil {
 			break
 		}
 		if !bFuncRet {
@@ -408,7 +426,7 @@ func getToConnectionInformation(
 		stToPods.DeploymentRef.Namespace = cDeploymentNamespace
 		pstToPodInfos.ToPodInfos[iConnIdx] = stToPods
 
-		if nil == pstCRDeployment {
+		if pstCRDeployment == nil {
 			if bPodControllerFlag {
 				log.Info(cFuncName + " detected that Deployment resource does not exist.")
 				bProcFlag = true
@@ -422,7 +440,7 @@ func getToConnectionInformation(
 		bProcFlag = true
 		cLabel, bExist := pstCRDeployment.Labels["dciappconnection"]
 		if bExist {
-			if len(cLabel) <= 0 {
+			if cLabel == "" {
 				if bPodControllerFlag {
 					log.Info(cFuncName + " detected that the value of the dciappconnection label in Deployment resource is empty.")
 					break
@@ -443,7 +461,8 @@ func getToConnectionInformation(
 						log.Info(cFuncName + " detected that the dciappconnection label does not match DCIAppConnectionCR within Name/Namespace.")
 						break
 					} else {
-						log.Error(err, cFuncName+" detected that the dciappconnection label does not match DCIAppConnectionCR within Name/Namespace.. It is not a call from the Pod controller, but a request for additional processing.")
+						log.Error(err, cFuncName+" detected that the dciappconnection label does not match DCIAppConnectionCR within Name/Namespace. "+
+							"It is not a call from the Pod controller, but a request for additional processing.")
 						bProcFlag = false
 						break
 					}
@@ -474,7 +493,7 @@ func getToConnectionInformation(
 		var pstServiceR *corev1.Service
 		var pstEndpointSliceR *discoveryv1.EndpointSlice
 
-		err, bFuncRet, pstServiceR, pstEndpointSliceR = getToConnectionInformationService(
+		bFuncRet, pstServiceR, pstEndpointSliceR, err = getToConnectionInformationService(
 			ctx,
 			rClient,
 			log,
@@ -499,7 +518,7 @@ func getToConnectionInformation(
 		pstToPodInfos.ToPodInfos[iConnIdx] = stToPods
 
 		var arToPod []examplecomv1.ToPodInfo
-		err, bFuncRet, arToPod = getToConnectionInformationPod(
+		bFuncRet, arToPod, err = getToConnectionInformationPod(
 			ctx,
 			rClient,
 			log,
@@ -537,8 +556,7 @@ func getToConnectionInformationService(
 	cDCIAppConnectionName string,
 	cDCIAppConnectionNamespace string,
 	bAdditionalProcFlag bool,
-	bPodControllerFlag bool) (error, bool, *corev1.Service, *discoveryv1.EndpointSlice) {
-
+	bPodControllerFlag bool) (bool, *corev1.Service, *discoveryv1.EndpointSlice, error) {
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" DeploymentRef: " + cDeploymentName + "," + cDeploymentNamespace +
@@ -551,8 +569,7 @@ func getToConnectionInformationService(
 	var pstServiceR *corev1.Service
 	var pstEndpointSliceR *discoveryv1.EndpointSlice
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		// Get Service Resource
 		stServiceR := &corev1.Service{}
 		err = rClient.Get(ctx,
@@ -560,17 +577,18 @@ func getToConnectionInformationService(
 				Name:      cDeploymentName,
 				Namespace: cDCIAppConnectionNamespace,
 			}, stServiceR)
-		if nil != err {
+		if err != nil {
 			if !errors.IsNotFound(err) {
 				log.Error(err, cFuncName+" failed to get Service resource.")
 				break
 			}
 			// Service not found
-			err = nil
+			err = nil //nolint:ineffassign // Service NotFound is intentionally normalized to a non-error state here.
 		} else {
 			if !stServiceR.DeletionTimestamp.IsZero() {
 				if !bPodControllerFlag && bAdditionalProcFlag {
-					log.Info(cFuncName + " detected that Service resource has a DeletionTimestamp. It is not a call from the Pod controller, but a request for additional processing.")
+					log.Info(cFuncName + " detected that Service resource has a DeletionTimestamp. " +
+						"It is not a call from the Pod controller, but a request for additional processing.")
 					break
 				}
 			}
@@ -584,7 +602,7 @@ func getToConnectionInformationService(
 				Name:      cDeploymentName,
 				Namespace: cDCIAppConnectionNamespace,
 			}, stEndpointSliceR)
-		if nil != err {
+		if err != nil {
 			if !errors.IsNotFound(err) {
 				log.Error(err, cFuncName+" failed to get EndpointSlice resource.")
 				break
@@ -594,7 +612,8 @@ func getToConnectionInformationService(
 		} else {
 			if !stEndpointSliceR.DeletionTimestamp.IsZero() {
 				if bAdditionalProcFlag {
-					log.Info(cFuncName + " detected that EndpointSlice resource has a DeletionTimestamp. It is not a call from the Pod controller, but a request for additional processing.")
+					log.Info(cFuncName + " detected that EndpointSlice resource has a DeletionTimestamp. " +
+						"It is not a call from the Pod controller, but a request for additional processing.")
 					break
 				}
 			}
@@ -607,7 +626,7 @@ func getToConnectionInformationService(
 	log.Info(cFuncName + " End." +
 		" bProcFlag: " + strconv.FormatBool(bProcFlag) +
 		", err: " + fmt.Sprint(err))
-	return err, bProcFlag, pstServiceR, pstEndpointSliceR
+	return bProcFlag, pstServiceR, pstEndpointSliceR, err
 }
 
 func getToConnectionInformationPod(
@@ -620,7 +639,7 @@ func getToConnectionInformationPod(
 	cDCIAppConnectionNamespace string,
 	bAdditionalProcFlag bool,
 	bPodControllerFlag bool,
-	pstCRPods *corev1.PodList) (error, bool, []examplecomv1.ToPodInfo) {
+	pstCRPods *corev1.PodList) (bool, []examplecomv1.ToPodInfo, error) {
 	bProcFlag := true
 	var stToPodInfos []examplecomv1.ToPodInfo
 
@@ -634,20 +653,21 @@ func getToConnectionInformationPod(
 	var bFuncRet bool
 	iPodCnt := 0
 
-	for iPodIdx := 0; len(pstCRPods.Items) > iPodIdx; iPodIdx++ {
-
+	for iPodIdx := range pstCRPods.Items {
 		stCRPod := pstCRPods.Items[iPodIdx]
 
-		// Check Running Phase
-		if corev1.PodRunning != stCRPod.Status.Phase {
+		// Check Ready
+		bReadyFlag := getConditionReady(&stCRPod)
+		if !bReadyFlag {
 			if !bPodControllerFlag && bAdditionalProcFlag {
-				log.Error(err, cFuncName+" detected that Pod resource Phase is not Running.Not a call from the Pod controller. And is a request for additional processing."+
+				log.Error(err, cFuncName+" detected that Pod resource Status.Conditions is not Ready. "+
+					"Not a call from the Pod controller. And is a request for additional processing."+
 					" Name: "+stCRPod.Name+
 					", Namespace: "+stCRPod.Namespace)
 				bProcFlag = false
 				break
 			} else {
-				log.Info(cFuncName + " detected that Pod resource Phase is not Running." +
+				log.Info(cFuncName + " detected that Pod resource Status.Conditions is not Ready." +
 					" Name: " + stCRPod.Name +
 					", Namespace: " + stCRPod.Namespace)
 			}
@@ -679,7 +699,7 @@ func getToConnectionInformationPod(
 				bHoldFlag = false
 			}
 		} else {
-			if len(cLabel) <= 0 {
+			if cLabel == "" {
 				if !bAdditionalProcFlag {
 					bHoldFlag = false
 				}
@@ -695,7 +715,9 @@ func getToConnectionInformationPod(
 					} else if !bAdditionalProcFlag {
 						bHoldFlag = false
 					} else {
-						log.Info(cFuncName + " detected that it does not match the value of the dciappconnection label in the Pod. It is not a call from the Pod controller, but a request for additional processing.")
+						log.Info(cFuncName +
+							" detected that it does not match the value of the dciappconnection label in the Pod." +
+							"It is not a call from the Pod controller, but a request for additional processing.")
 						bProcFlag = false
 						break
 					}
@@ -719,7 +741,7 @@ func getToConnectionInformationPod(
 	log.Info(cFuncName + " End." +
 		" bProcFlag: " + strconv.FormatBool(bProcFlag) +
 		", err: " + fmt.Sprint(err))
-	return err, bProcFlag, stToPodInfos
+	return bProcFlag, stToPodInfos, err
 }
 
 func getDeploymentList(
@@ -729,8 +751,7 @@ func getDeploymentList(
 	cDeploymentName string,
 	cDeploymentNamespace string,
 	bAdditionalProcFlag bool,
-	bPodControllerFlag bool) (error, bool, *appsv1.Deployment, *corev1.PodList) {
-
+	bPodControllerFlag bool) (bool, *appsv1.Deployment, *corev1.PodList, error) {
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" DeploymentRef: " + cDeploymentName + "," + cDeploymentNamespace +
@@ -741,8 +762,7 @@ func getDeploymentList(
 	var pstCRDeployment *appsv1.Deployment
 	pstCRPods := &corev1.PodList{}
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		pstGetCRDeployment := &appsv1.Deployment{}
 		// Get Deployment Resource
 		err = rClient.Get(ctx,
@@ -751,7 +771,7 @@ func getDeploymentList(
 				Namespace: cDeploymentNamespace,
 			},
 			pstGetCRDeployment)
-		if nil != err {
+		if err != nil {
 			if errors.IsNotFound(err) {
 				err = nil
 				log.Info(cFuncName + " could not find Deployment resource.")
@@ -765,9 +785,9 @@ func getDeploymentList(
 			}
 			break
 		}
-		cName, bExist := pstGetCRDeployment.Labels["app.kubernetes.io/name"]
+		cName, bExist := pstGetCRDeployment.Labels[KubernetesAppNameLabel]
 		if !bExist {
-			log.Info(cFuncName + " could not find Deployment resource label app.kubernetes.io/name.")
+			log.Info(cFuncName + " could not find Deployment resource label " + KubernetesAppNameLabel + ".")
 			if !bPodControllerFlag && bAdditionalProcFlag {
 				// do nothing
 			} else {
@@ -784,11 +804,11 @@ func getDeploymentList(
 				Namespace: cDeploymentNamespace,
 				LabelSelector: labels.SelectorFromSet(
 					map[string]string{
-						"app.kubernetes.io/name": cName,
+						KubernetesAppNameLabel: cName,
 					},
 				),
 			})
-		if nil != err {
+		if err != nil {
 			log.Error(err, cFuncName+" failed to list ReplicaSet resource.")
 			break
 		}
@@ -804,8 +824,7 @@ func getDeploymentList(
 
 		bFuncRet := true
 
-		for iReplicaIdx := 0; len(pstCRReplicaSets.Items) > iReplicaIdx; iReplicaIdx++ {
-
+		for iReplicaIdx := range pstCRReplicaSets.Items {
 			pstCRReplicaSet := pstCRReplicaSets.Items[iReplicaIdx]
 			bReplicaSetDeletedFlag := false
 
@@ -821,11 +840,10 @@ func getDeploymentList(
 			}
 
 			if !bReplicaSetDeletedFlag {
-
-				cPodHash, exist := pstCRReplicaSet.Labels["pod-template-hash"]
+				cPodHash, exist := pstCRReplicaSet.Labels[PodTemplateHash]
 				if !exist {
 					if !bPodControllerFlag && bAdditionalProcFlag {
-						log.Info(cFuncName + "getDeploymentList could not find pod-template-hash label in ReplicaSet resource.")
+						log.Info(cFuncName + " getDeploymentList could not find " + PodTemplateHash + " label in ReplicaSet resource.")
 						bFuncRet = false
 						break
 					}
@@ -839,12 +857,12 @@ func getDeploymentList(
 						Namespace: pstCRReplicaSet.Namespace,
 						LabelSelector: labels.SelectorFromSet(
 							labels.Set{
-								"app.kubernetes.io/name": cName,
-								"pod-template-hash":      cPodHash,
+								KubernetesAppNameLabel: cName,
+								PodTemplateHash:        cPodHash,
 							},
 						),
 					})
-				if nil != err {
+				if err != nil {
 					log.Error(err, cFuncName+" failed to list Pod resource.")
 					break
 				}
@@ -853,34 +871,33 @@ func getDeploymentList(
 						" Name: " + pstCRReplicaSet.Name +
 						", Namespace: " + pstCRReplicaSet.Namespace)
 				} else {
-					log.Info(cFuncName + "Pod resource list num: " + strconv.Itoa(len(pstCRPodList.Items)) +
+					log.Info(cFuncName + " Pod resource list num: " + strconv.Itoa(len(pstCRPodList.Items)) +
 						" Name: " + pstCRReplicaSet.Name +
 						", Namespace: " + pstCRReplicaSet.Namespace)
-					for iPodIdx := 0; len(pstCRPodList.Items) > iPodIdx; iPodIdx++ {
-						pstCRPods.Items = append(pstCRPods.Items,
-							pstCRPodList.Items[iPodIdx])
-					}
+					pstCRPods.Items = append(pstCRPods.Items, pstCRPodList.Items...)
 				}
 			}
 		}
 		if bFuncRet {
 			if pstGetCRDeployment.Spec.Replicas != nil {
-				if *pstGetCRDeployment.Spec.Replicas != int32(len(pstCRPods.Items)) {
+				expectedReplicas := int(*pstGetCRDeployment.Spec.Replicas)
+				actualPods := len(pstCRPods.Items)
+				if expectedReplicas != actualPods {
 					if !bPodControllerFlag && bAdditionalProcFlag {
-						log.Error(err, cFuncName+" detected  a mismatch in the number of Pod resource. It is not a call from the Pod controller, but a request for additional processing.")
+						log.Info(cFuncName + " detected a mismatch in the number of Pod resource. " +
+							"It is not a call from the Pod controller, but a request for additional processing.")
 						bFuncRet = false
 					} else {
-						log.Info(cFuncName + " Pod resource count: expected: " + strconv.Itoa(int(*pstGetCRDeployment.Spec.Replicas)) + ", actual: " + strconv.Itoa(len(pstCRPods.Items)))
+						log.Info(cFuncName + " Pod resource count: expected: " + strconv.Itoa(expectedReplicas) + ", actual: " + strconv.Itoa(actualPods))
 					}
 				}
-			} else {
-				if len(pstCRPods.Items) != 1 {
-					if !bPodControllerFlag && bAdditionalProcFlag {
-						log.Error(err, cFuncName+" detected  a mismatch in the number of Pod resource. It is not a call from the Pod controller, but a request for additional processing.")
-						bFuncRet = false
-					} else {
-						log.Info(cFuncName + " Pod resource count: expected: 1 , actual: " + strconv.Itoa(len(pstCRPods.Items)))
-					}
+			} else if len(pstCRPods.Items) != 1 {
+				if !bPodControllerFlag && bAdditionalProcFlag {
+					log.Info(cFuncName + " detected a mismatch in the number of Pod resource. " +
+						"It is not a call from the Pod controller, but a request for additional processing.")
+					bFuncRet = false
+				} else {
+					log.Info(cFuncName + " Pod resource count: expected: 1 , actual: " + strconv.Itoa(len(pstCRPods.Items)))
 				}
 			}
 		}
@@ -892,11 +909,13 @@ func getDeploymentList(
 	log.Info(cFuncName + " End." +
 		" bProcFlag: " + strconv.FormatBool(bProcFlag) +
 		", err: " + fmt.Sprint(err))
-	return err, bProcFlag, pstCRDeployment, pstCRPods
+	return bProcFlag, pstCRDeployment, pstCRPods, err
 }
 
 const (
-	Interface2ndNicDef = "net1"
+	Interface2ndNicDef     = "net1"
+	KubernetesAppNameLabel = "app.kubernetes.io/name"
+	PodTemplateHash        = "pod-template-hash"
 )
 
 func get2ndNicAddress(
@@ -905,7 +924,6 @@ func get2ndNicAddress(
 	log logr.Logger,
 	pstCRPod *corev1.Pod,
 	pc2ndNicAddress *string) (error, bool) {
-
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" PodRef: " + pstCRPod.Name + "," + pstCRPod.Namespace)
@@ -913,15 +931,14 @@ func get2ndNicAddress(
 	var err error
 	*pc2ndNicAddress = ""
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		// Parse network-status annotation directly to obtain 2nd NIC address.
 		bHostDeviceNetworkFlag := false
 		cHostDeviceNWName, exists := pstCRPod.Annotations["k8s.v1.cni.cncf.io/networks"]
 		// If a HostDeviceNetwork name is configured, attempt to fetch it. Tests may leave
 		// cHostDeviceNWName empty which skips this lookup.
 		if exists {
-			if len(cHostDeviceNWName) != 0 {
+			if cHostDeviceNWName != "" {
 				stHostDeviceNW := &hostdevicenetwork.HostDeviceNetwork{}
 				err = rClient.Get(ctx,
 					client.ObjectKey{
@@ -931,9 +948,9 @@ func get2ndNicAddress(
 					stHostDeviceNW)
 
 				if errors.IsNotFound(err) {
-					log.Error(err, cFuncName+" could not find HostDeviceNetwork."+
-						" Name: "+cHostDeviceNWName+
-						", Namespace: "+pstCRPod.Namespace)
+					log.Info(cFuncName + " could not find HostDeviceNetwork." +
+						" Name: " + cHostDeviceNWName +
+						", Namespace: " + pstCRPod.Namespace)
 					err = nil
 				} else if err != nil {
 					log.Error(err, cFuncName+" failed to fetch HostDeviceNetwork."+
@@ -964,14 +981,14 @@ func get2ndNicAddress(
 			break
 		}
 
-		if len(cAnnotationJSON) == 0 {
+		if cAnnotationJSON == "" {
 			log.Info(cFuncName + " detected that Pod resource annotations[k8s.v1.cni.cncf.io/network-status] length is Zero." +
 				" Name: " + pstCRPod.Name +
 				", Namespace: " + pstCRPod.Namespace)
 			break
 		}
 
-		log.Info("Pod 2nd NIC Info." +
+		log.Info(cFuncName + " Pod 2nd NIC Info." +
 			" Name: " + pstCRPod.Name +
 			", Namespace: " + pstCRPod.Namespace +
 			", Annotation[k8s.v1.cni.cncf.io/network-status]: " +
@@ -981,7 +998,7 @@ func get2ndNicAddress(
 
 		var stInterfaces []examplecomv1.NetworkStatus
 		err = jsonUnmarshalFunc(bytes, &stInterfaces)
-		if nil != err {
+		if err != nil {
 			log.Error(err, cFuncName+" failed to json.unmarshal annotation."+
 				" Name: "+pstCRPod.Name+
 				", Namespace: "+pstCRPod.Namespace)
@@ -1025,19 +1042,19 @@ func makeConnectEndpoint(
 	pstCRConnection *examplecomv1.DCIAppConnection,
 	pstFromPodInfo *examplecomv1.FromPodInfo,
 	pstToPods *examplecomv1.ToPodInfos) error {
-
 	var err error
 
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start.")
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
+	for range 1 {
 		pstCRConnectEndpoint := &examplecomv1.ConnectEndpoint{}
 
 		bAddFlag := false
+		var stInputEndpoint examplecomv1.ExternalEndpoint
+		var stOutputEndpoint examplecomv1.ExternalEndpoint
 		if !pstFromPodInfo.DeleteFlag {
-
-			if nil == pstFromPodInfo.ConnectEndpointCR {
+			if pstFromPodInfo.ConnectEndpointCR == nil {
 				bAddFlag = true
 			}
 
@@ -1051,7 +1068,7 @@ func makeConnectEndpoint(
 					pstCRConnection,
 					pstCRConnectEndpoint,
 					rScheme)
-				if nil != err {
+				if err != nil {
 					log.Error(err,
 						cFuncName+" failed to set ConnectEndpointCR OwnerReference."+
 							" Name: "+pstCRConnectEndpoint.Name+
@@ -1061,7 +1078,7 @@ func makeConnectEndpoint(
 			} else {
 				pstBaseCRConnectEndpoint = client.MergeFrom(
 					pstFromPodInfo.ConnectEndpointCR.DeepCopy())
-				pstCRConnectEndpoint = pstFromPodInfo.ConnectEndpointCR
+				pstCRConnectEndpoint = pstFromPodInfo.ConnectEndpointCR.DeepCopy()
 			}
 
 			// Set From Deployment Connection Information (Sync Spec/Status)
@@ -1078,26 +1095,23 @@ func makeConnectEndpoint(
 			pstCRConnectEndpoint.Status.From.FromPod.PodRef.Namespace = pstFromPodInfo.PodR.Namespace
 			pstCRConnectEndpoint.Status.From.FromPod.Address = pstFromPodInfo.Address
 
-			pstInputEndpoint := examplecomv1.ExternalEndpoint{}
 			// Set Input-Output Endpoint Information
-			if examplecomv1.IOModeIN == pstFromPodInfo.IOMode ||
-				examplecomv1.IOModeINOUT == pstFromPodInfo.IOMode {
-				pstInputEndpoint.ExternalSubsets =
-					pstCRConnection.Spec.InputEndpoint.ExternalSubsets
-				pstCRConnectEndpoint.Spec.InputEndpoint =
-					&pstInputEndpoint
+			if len(pstFromPodInfo.InputSubsets) != 0 {
+				stInputEndpoint.ExternalSubsets = pstFromPodInfo.InputSubsets
+				pstCRConnectEndpoint.Spec.InputEndpoint = &stInputEndpoint
+			} else {
+				pstCRConnectEndpoint.Spec.InputEndpoint = nil
 			}
-			pstOutputEndpoint := examplecomv1.ExternalEndpoint{}
-			if examplecomv1.IOModeOUT == pstFromPodInfo.IOMode ||
-				examplecomv1.IOModeINOUT == pstFromPodInfo.IOMode {
-				pstOutputEndpoint.ExternalSubsets =
-					pstCRConnection.Spec.OutputEndpoint.ExternalSubsets
-				pstCRConnectEndpoint.Spec.OutputEndpoint =
-					&pstOutputEndpoint
+
+			if len(pstFromPodInfo.OutputSubsets) != 0 {
+				stOutputEndpoint.ExternalSubsets = pstFromPodInfo.OutputSubsets
+				pstCRConnectEndpoint.Spec.OutputEndpoint = &stOutputEndpoint
+			} else {
+				pstCRConnectEndpoint.Spec.OutputEndpoint = nil
 			}
 
 			stToDeplotments := []examplecomv1.ToDeployment{}
-			for iFromDeployIdx := 0; len(pstFromPodInfo.DeploymentIndexs) > iFromDeployIdx; iFromDeployIdx++ {
+			for iFromDeployIdx := range pstFromPodInfo.DeploymentIndexs {
 				iToDeploymentIndex := pstFromPodInfo.DeploymentIndexs[iFromDeployIdx]
 
 				stToPods := pstToPods.ToPodInfos[iToDeploymentIndex]
@@ -1105,12 +1119,12 @@ func makeConnectEndpoint(
 				log.Info(cFuncName + " refers to the From array and sets ConnectEndpointCR." +
 					" FromIndex: " + strconv.Itoa(iFromDeployIdx) +
 					", FromName: " + pstFromPodInfo.PodR.Name +
-					", ToIndex: " + strconv.Itoa(int(iToDeploymentIndex)) +
+					", ToIndex: " + strconv.Itoa(iToDeploymentIndex) +
 					", Tolen: " + strconv.Itoa(len(stToPods.ToPods)))
 
 				stEndpoints := []examplecomv1.ToPod{}
 
-				for iToPodIdx := 0; len(stToPods.ToPods) > iToPodIdx; iToPodIdx++ {
+				for iToPodIdx := range stToPods.ToPods {
 					stToPod := stToPods.ToPods[iToPodIdx]
 					if stToPod.DeleteFlag {
 						continue
@@ -1133,7 +1147,7 @@ func makeConnectEndpoint(
 
 			if bAddFlag {
 				err = rClient.Create(ctx, pstCRConnectEndpoint)
-				if nil != err {
+				if err != nil {
 					log.Error(err, cFuncName+" failed to create ConnectEndpointCR."+
 						" Name: "+pstCRConnectEndpoint.Name+
 						", Namespace: "+pstCRConnectEndpoint.Namespace)
@@ -1146,7 +1160,7 @@ func makeConnectEndpoint(
 				err = rClient.Patch(ctx,
 					pstCRConnectEndpoint,
 					pstBaseCRConnectEndpoint)
-				if nil != err {
+				if err != nil {
 					log.Error(err, cFuncName+" failed to patch ConnectEndpointCR."+
 						" Name: "+pstCRConnectEndpoint.Name+
 						", Namespace: "+pstCRConnectEndpoint.Namespace)
@@ -1156,7 +1170,6 @@ func makeConnectEndpoint(
 					" Name: " + pstCRConnectEndpoint.Name +
 					", Namespace: " + pstCRConnectEndpoint.Namespace)
 			}
-			pstFromPodInfo.ConnectEndpointCR = pstCRConnectEndpoint
 		}
 	}
 	log.Info(cFuncName + " End." +
@@ -1169,18 +1182,16 @@ func deleteConnectEndpoint(
 	rClient client.Client,
 	log logr.Logger,
 	pstCRConnectEndpoint *examplecomv1.ConnectEndpoint) error {
-
 	var err error
 
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start.")
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		if pstCRConnectEndpoint != nil {
 			// Delete ConnectEndpoint Resource
 			err = rClient.Delete(ctx, pstCRConnectEndpoint)
-			if nil != err {
+			if err != nil {
 				log.Error(err, cFuncName+" failed to delete ConnectEndpointCR."+
 					" Name: "+pstCRConnectEndpoint.Name+
 					", Namespace: "+pstCRConnectEndpoint.Namespace)
@@ -1206,15 +1217,13 @@ func unsetDciPodConnectionRelationship(
 	cLabelKey string,
 	cFinalizerName string,
 	pstCRPod *corev1.Pod) error {
-
 	var err error
 
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" PodRef: " + pstCRPod.Name + "," + pstCRPod.Namespace)
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		// Update Pod Resource
 		pstBaseCRPod := client.MergeFrom(pstCRPod.DeepCopy())
 
@@ -1225,7 +1234,7 @@ func unsetDciPodConnectionRelationship(
 		log.Info(cFuncName + " removed the finalizer.")
 
 		err = rClient.Patch(ctx, pstCRPod, pstBaseCRPod)
-		if nil != err {
+		if err != nil {
 			log.Error(err, cFuncName+" failed to patch Pod resource."+
 				" Name: "+pstCRPod.Name+
 				", Namespace: "+pstCRPod.Namespace)
@@ -1248,15 +1257,13 @@ func unsetDciDeploymentConnectionRelationship(
 	cLabelKey string,
 	cFinalizerName string,
 	pstDeploymentR *appsv1.Deployment) error {
-
 	var err error
 
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" DeploymentRef: " + pstDeploymentR.Name + "," + pstDeploymentR.Namespace)
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		// Update Deployment Resource
 		pstBaseCRDeployment := client.MergeFrom(pstDeploymentR.DeepCopy())
 
@@ -1267,7 +1274,7 @@ func unsetDciDeploymentConnectionRelationship(
 		log.Info(cFuncName + " removed the finalizer.")
 
 		err = rClient.Patch(ctx, pstDeploymentR, pstBaseCRDeployment)
-		if nil != err {
+		if err != nil {
 			log.Error(err, cFuncName+" failed to patch Deployment resource."+
 				" Name: "+pstDeploymentR.Name+
 				", Namespace: "+pstDeploymentR.Namespace)
@@ -1291,7 +1298,6 @@ func setDciPodConnectionRelationship(
 	cLabelVal string,
 	cFinalizerName string,
 	pstCRPod *corev1.Pod) error {
-
 	var err error
 
 	cFuncName := getFuncName()
@@ -1301,8 +1307,7 @@ func setDciPodConnectionRelationship(
 		", FinalizerName: " + cFinalizerName +
 		", PodRef: " + pstCRPod.Name + "," + pstCRPod.Namespace)
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		// Update Pod Resource
 		pstBaseCRPod := client.MergeFrom(pstCRPod.DeepCopy())
 
@@ -1313,7 +1318,7 @@ func setDciPodConnectionRelationship(
 		log.Info(cFuncName + " added a finalizer to Pod resource.")
 
 		err = rClient.Patch(ctx, pstCRPod, pstBaseCRPod)
-		if nil != err {
+		if err != nil {
 			log.Error(err, cFuncName+" failed to patch Pod resource."+
 				" Name: "+pstCRPod.Name+
 				", Namespace: "+pstCRPod.Namespace)
@@ -1336,7 +1341,6 @@ func setDciDeploymentConnectionRelationship(
 	cLabelVal string,
 	cFinalizerName string,
 	cDeploymentR *appsv1.Deployment) error {
-
 	var err error
 
 	cFuncName := getFuncName()
@@ -1346,8 +1350,7 @@ func setDciDeploymentConnectionRelationship(
 		", FinalizerName: " + cFinalizerName +
 		", DeploymentRef: " + cDeploymentR.Name + "," + cDeploymentR.Namespace)
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		// Update Deployment Resource
 		pstBaseCRDeployment := client.MergeFrom(cDeploymentR.DeepCopy())
 
@@ -1358,7 +1361,7 @@ func setDciDeploymentConnectionRelationship(
 		log.Info(cFuncName + " added a finalizer to Deployment resource.")
 
 		err = rClient.Patch(ctx, cDeploymentR, pstBaseCRDeployment)
-		if nil != err {
+		if err != nil {
 			log.Error(err, cFuncName+" failed to patch Deployment resource."+
 				" Name: "+cDeploymentR.Name+
 				", Namespace: "+cDeploymentR.Namespace)
@@ -1374,13 +1377,12 @@ func setDciDeploymentConnectionRelationship(
 }
 
 func getAppendEndpointSlice(
-	ctx context.Context,
+	_ context.Context,
 	rClient client.Client,
 	log logr.Logger,
 	pstCRPod *corev1.Pod,
 	pstCREndpointSlice *discoveryv1.EndpointSlice,
 	c2ndNicAddress string) {
-
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" PodRef: " + pstCRPod.Name + "," + pstCRPod.Namespace +
@@ -1391,10 +1393,11 @@ func getAppendEndpointSlice(
 	cKind := strings.ToLower(gvks[0].Kind)
 
 	stEndpoints := []discoveryv1.Endpoint{}
-	for iEndpointIdx := 0; len(pstCREndpointSlice.Endpoints) > iEndpointIdx; iEndpointIdx++ {
+	for iEndpointIdx := range pstCREndpointSlice.Endpoints {
 		stEndpoint := pstCREndpointSlice.Endpoints[iEndpointIdx]
 
-		if cKind == strings.ToLower(stEndpoint.TargetRef.Kind) &&
+		// if cKind == strings.ToLower(stEndpoint.TargetRef.Kind) &&
+		if strings.EqualFold(cKind, stEndpoint.TargetRef.Kind) &&
 			pstCRPod.Name == stEndpoint.TargetRef.Name &&
 			pstCRPod.Namespace == stEndpoint.TargetRef.Namespace {
 			var cAddresses []string
@@ -1429,11 +1432,13 @@ func getAppendEndpointSlice(
 	pstCREndpointSlice.Endpoints = stEndpoints
 
 	log.Info(cFuncName + " End.")
-	return
 }
 
 func getFuncName() string {
-	pc, _, _, _ := pkgrt.Caller(1)
+	pc, _, _, ok := runtimeCallerFunc(1)
+	if !ok {
+		return ""
+	}
 	cFuncName := pkgrt.FuncForPC(pc).Name()
 	idx := 0
 	iLastIdx := strings.LastIndex(cFuncName, ".")

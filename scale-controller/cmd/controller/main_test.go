@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
@@ -51,17 +37,19 @@ import (
 
 	scalev1 "scale-controller/api/v1alpha1"
 	"scale-controller/internal/helper/utils"
+	webhookv1 "scale-controller/internal/webhook/v1alpha1"
 	"scale-controller/test/testutils/mock"
 )
 
 // arguments for backup of original global variables
 var (
-	origOsArgs                 = slices.Clone(os.Args)
-	origNewManager             = ctrl.NewManager
-	origGetConfigOrDie         = ctrl.GetConfigOrDie
-	origNewControllerManagedBy = ctrl.NewControllerManagedBy
-	origNewWebhookManagedBy    = ctrl.NewWebhookManagedBy
-	origSetupSignalHandler     = ctrl.SetupSignalHandler
+	origOsArgs                                = slices.Clone(os.Args)
+	origNewManager                            = ctrl.NewManager
+	origGetConfigOrDie                        = ctrl.GetConfigOrDie
+	origNewControllerManagedBy                = ctrl.NewControllerManagedBy
+	origNewNodeScalingRequestWebhookManagedBy = webhookv1.NewNodeScalingRequestWebhookManagedBy
+	origNewCardScalingRequestWebhookManagedBy = webhookv1.NewCardScalingRequestWebhookManagedBy
+	origSetupSignalHandler                    = ctrl.SetupSignalHandler
 )
 
 // TestScaleController_run is a white-box-test function using testing module
@@ -80,7 +68,8 @@ func TestScaleController_run(t *testing.T) {
 		ctrl.GetConfigOrDie = origGetConfigOrDie
 		ctrl.NewManager = origNewManager
 		ctrl.NewControllerManagedBy = origNewControllerManagedBy
-		ctrl.NewWebhookManagedBy = origNewWebhookManagedBy
+		webhookv1.NewNodeScalingRequestWebhookManagedBy = origNewNodeScalingRequestWebhookManagedBy
+		webhookv1.NewCardScalingRequestWebhookManagedBy = origNewCardScalingRequestWebhookManagedBy
 		ctrl.SetupSignalHandler = origSetupSignalHandler
 
 		t.Log("Finish gomock controller")
@@ -170,7 +159,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				// replace global variables
 				os.Args = args
@@ -193,7 +182,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				// replace global variables
 				os.Args = args
@@ -217,14 +206,15 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				// replace global variables
 				os.Args = args
 				ctrl.GetConfigOrDie = newDummyGetConfigOrDie()
 				ctrl.NewManager = newDummyNewManager(mgr)
 				ctrl.NewControllerManagedBy = newDummyNewControllerManagedBy()
-				ctrl.NewWebhookManagedBy = newDummyNewWebhookManagedBy(nil)
+				webhookv1.NewNodeScalingRequestWebhookManagedBy = newDummyNewNodeScalingRequestWebhookManagedBy(nil)
+				webhookv1.NewCardScalingRequestWebhookManagedBy = newDummyNewCardScalingRequestWebhookManagedBy(nil)
 				// setup environment variables
 				_ = os.Unsetenv(utils.ProviderTypeEnvVarName)
 				_ = os.Setenv("NSR_TTL_SECONDS_AFTER_FINISHED", "")
@@ -245,14 +235,15 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				// replace global variables
 				os.Args = args
 				ctrl.GetConfigOrDie = newDummyGetConfigOrDie()
 				ctrl.NewManager = newDummyNewManager(mgr)
 				ctrl.NewControllerManagedBy = newDummyNewControllerManagedBy()
-				ctrl.NewWebhookManagedBy = newDummyNewWebhookManagedBy([]int{1})
+				webhookv1.NewNodeScalingRequestWebhookManagedBy = newDummyNewNodeScalingRequestWebhookManagedBy([]int{1})
+				webhookv1.NewCardScalingRequestWebhookManagedBy = newDummyNewCardScalingRequestWebhookManagedBy(nil)
 				// setup environment variables
 				_ = os.Unsetenv(utils.ProviderTypeEnvVarName)
 				_ = os.Unsetenv("NSR_TTL_SECONDS_AFTER_FINISHED")
@@ -273,14 +264,15 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				// replace global variables
 				os.Args = args
 				ctrl.GetConfigOrDie = newDummyGetConfigOrDie()
 				ctrl.NewManager = newDummyNewManager(mgr)
 				ctrl.NewControllerManagedBy = newDummyNewControllerManagedBy()
-				ctrl.NewWebhookManagedBy = newDummyNewWebhookManagedBy(nil)
+				webhookv1.NewNodeScalingRequestWebhookManagedBy = newDummyNewNodeScalingRequestWebhookManagedBy(nil)
+				webhookv1.NewCardScalingRequestWebhookManagedBy = newDummyNewCardScalingRequestWebhookManagedBy(nil)
 				// setup environment variables
 				_ = os.Unsetenv(utils.ProviderTypeEnvVarName)
 				_ = os.Unsetenv("NSR_TTL_SECONDS_AFTER_FINISHED")
@@ -302,14 +294,15 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				// replace global variables
 				os.Args = args
 				ctrl.GetConfigOrDie = newDummyGetConfigOrDie()
 				ctrl.NewManager = newDummyNewManager(mgr)
 				ctrl.NewControllerManagedBy = newDummyNewControllerManagedBy()
-				ctrl.NewWebhookManagedBy = newDummyNewWebhookManagedBy([]int{2})
+				webhookv1.NewNodeScalingRequestWebhookManagedBy = newDummyNewNodeScalingRequestWebhookManagedBy(nil)
+				webhookv1.NewCardScalingRequestWebhookManagedBy = newDummyNewCardScalingRequestWebhookManagedBy([]int{1})
 				// setup environment variables
 				_ = os.Unsetenv(utils.ProviderTypeEnvVarName)
 				_ = os.Unsetenv("NSR_TTL_SECONDS_AFTER_FINISHED")
@@ -331,14 +324,15 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				// replace global variables
 				os.Args = args
 				ctrl.GetConfigOrDie = newDummyGetConfigOrDie()
 				ctrl.NewManager = newDummyNewManager(mgr)
 				ctrl.NewControllerManagedBy = newDummyNewControllerManagedBy()
-				ctrl.NewWebhookManagedBy = newDummyNewWebhookManagedBy(nil)
+				webhookv1.NewNodeScalingRequestWebhookManagedBy = newDummyNewNodeScalingRequestWebhookManagedBy(nil)
+				webhookv1.NewCardScalingRequestWebhookManagedBy = newDummyNewCardScalingRequestWebhookManagedBy(nil)
 				// setup environment variables
 				_ = os.Unsetenv(utils.ProviderTypeEnvVarName)
 				_ = os.Unsetenv("NSR_TTL_SECONDS_AFTER_FINISHED")
@@ -361,7 +355,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(errors.New("dummy-error"))
 				// replace global variables
@@ -392,7 +386,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(errors.New("dummy-error"))
 				// replace global variables
@@ -422,7 +416,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().AddHealthzCheck(gomock.Any(), gomock.Any()).AnyTimes().Return(errors.New("dummy-error"))
@@ -453,7 +447,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().AddHealthzCheck(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -485,7 +479,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().AddHealthzCheck(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -519,7 +513,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().AddHealthzCheck(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -555,7 +549,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().AddHealthzCheck(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -566,7 +560,8 @@ func TestScaleController_run(t *testing.T) {
 				ctrl.GetConfigOrDie = newDummyGetConfigOrDie()
 				ctrl.NewManager = newDummyNewManager(mgr)
 				ctrl.NewControllerManagedBy = newDummyNewControllerManagedBy()
-				ctrl.NewWebhookManagedBy = newDummyNewWebhookManagedBy(nil)
+				webhookv1.NewNodeScalingRequestWebhookManagedBy = newDummyNewNodeScalingRequestWebhookManagedBy(nil)
+				webhookv1.NewCardScalingRequestWebhookManagedBy = newDummyNewCardScalingRequestWebhookManagedBy(nil)
 				ctrl.SetupSignalHandler = newDummySetupSignalHandler()
 				// setup environment variables
 				_ = os.Unsetenv(utils.ProviderTypeEnvVarName)
@@ -592,7 +587,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().AddHealthzCheck(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -603,7 +598,8 @@ func TestScaleController_run(t *testing.T) {
 				ctrl.GetConfigOrDie = newDummyGetConfigOrDie()
 				ctrl.NewManager = newDummyNewManager(mgr)
 				ctrl.NewControllerManagedBy = newDummyNewControllerManagedBy()
-				ctrl.NewWebhookManagedBy = newDummyNewWebhookManagedBy(nil)
+				webhookv1.NewNodeScalingRequestWebhookManagedBy = newDummyNewNodeScalingRequestWebhookManagedBy(nil)
+				webhookv1.NewCardScalingRequestWebhookManagedBy = newDummyNewCardScalingRequestWebhookManagedBy(nil)
 				ctrl.SetupSignalHandler = newDummySetupSignalHandler()
 				// setup environment variables
 				_ = os.Setenv(utils.ProviderTypeEnvVarName, "docker")
@@ -629,7 +625,7 @@ func TestScaleController_run(t *testing.T) {
 				mgr := mock.NewMockManager(c)
 				mgr.EXPECT().GetClient().AnyTimes().Return(nil)
 				mgr.EXPECT().GetScheme().AnyTimes().Return(nil)
-				mgr.EXPECT().GetEventRecorderFor(gomock.Any()).AnyTimes().Return(nil)
+				mgr.EXPECT().GetEventRecorder(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().GetLogger().AnyTimes().Return(logger)
 				mgr.EXPECT().Add(gomock.Any()).AnyTimes().Return(nil)
 				mgr.EXPECT().AddHealthzCheck(gomock.Any(), gomock.Any()).AnyTimes().Return(nil)
@@ -640,7 +636,8 @@ func TestScaleController_run(t *testing.T) {
 				ctrl.GetConfigOrDie = newDummyGetConfigOrDie()
 				ctrl.NewManager = newDummyNewManager(mgr)
 				ctrl.NewControllerManagedBy = newDummyNewControllerManagedBy()
-				ctrl.NewWebhookManagedBy = newDummyNewWebhookManagedBy(nil)
+				webhookv1.NewNodeScalingRequestWebhookManagedBy = newDummyNewNodeScalingRequestWebhookManagedBy(nil)
+				webhookv1.NewCardScalingRequestWebhookManagedBy = newDummyNewCardScalingRequestWebhookManagedBy(nil)
 				ctrl.SetupSignalHandler = newDummySetupSignalHandler()
 				// setup environment variables
 				_ = os.Setenv(utils.ProviderTypeEnvVarName, "docker")
@@ -933,14 +930,16 @@ func newDummyNewControllerManagedBy() func(manager.Manager) *ctrl.Builder {
 }
 
 // newDummyNewWebhookManagedBy returns a dummy function to replace ctrl.NewWebhookManagedBy
-func newDummyNewWebhookManagedBy(errorCalls []int) func(manager.Manager) *builder.WebhookBuilder {
+func newDummyNewWebhookManagedBy[T runtime.Object](
+	errorCalls []int, defaultFunc func(manager.Manager) *builder.WebhookBuilder[T],
+) func(manager.Manager) *builder.WebhookBuilder[T] {
 	countCall := 0 // closure variable to count calls
 	s := runtime.NewScheme()
 	if err := scalev1.AddToScheme(s); err != nil {
 		panic(err)
 	}
 	errorScheme := runtime.NewScheme()
-	return func(_ manager.Manager) *builder.WebhookBuilder {
+	return func(_ manager.Manager) *builder.WebhookBuilder[T] {
 		usingScheme := s
 		countCall++
 		if slices.Contains(errorCalls, countCall) {
@@ -952,8 +951,18 @@ func newDummyNewWebhookManagedBy(errorCalls []int) func(manager.Manager) *builde
 				SkipNameValidation: ptr.To(true),
 			},
 		})
-		return origNewWebhookManagedBy(m)
+		return defaultFunc(m)
 	}
+}
+
+// newDummyNewWebhookManagedBy returns a dummy function to replace ctrl.NewWebhookManagedBy
+func newDummyNewNodeScalingRequestWebhookManagedBy(errorCalls []int) func(manager.Manager) *builder.WebhookBuilder[*scalev1.NodeScalingRequest] {
+	return newDummyNewWebhookManagedBy[*scalev1.NodeScalingRequest](errorCalls, origNewNodeScalingRequestWebhookManagedBy)
+}
+
+// newDummyNewWebhookManagedBy returns a dummy function to replace ctrl.NewWebhookManagedBy
+func newDummyNewCardScalingRequestWebhookManagedBy(errorCalls []int) func(manager.Manager) *builder.WebhookBuilder[*scalev1.CardScalingRequest] {
+	return newDummyNewWebhookManagedBy[*scalev1.CardScalingRequest](errorCalls, origNewCardScalingRequestWebhookManagedBy)
 }
 
 // newDummySetupSignalHandler returns a dummy function to replace ctrl.SetupSignalHandler

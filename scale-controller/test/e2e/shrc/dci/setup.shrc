@@ -25,9 +25,9 @@ setup_management_cluster() {
     sleep 3
 
     echo "Applying CRDs for Cluster-API and DCI-Manager started..."
-    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/v1.12.0/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/v1.12.0/config/crd/bases/cluster.x-k8s.io_machines.yaml
-    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/v1.12.0/config/crd/bases/cluster.x-k8s.io_machinesets.yaml
+    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
+    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machines.yaml
+    kubectl --context kind-${cluster_name_m} apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machinesets.yaml
     kubectl --context kind-${cluster_name_m} apply -f ${dir_dci_provider_top}/config/crd/bases
     kubectl --context kind-${cluster_name_m} apply -f ${dir_rpm_top}/config/crd/bases
     echo "Applying CRDs for Cluster-API and DCI-Manager finished successfully."
@@ -142,8 +142,8 @@ install_scale_controller() {
         helm install scale-controller ${dir_repo_top}/dist/scale-controller-${scale_controller_helm_chart_version//\"/}.tgz \
             --create-namespace \
             --namespace ${namespace} \
-            --set controllerManager.container.image.repository=${scale_controller_image_name} \
-            --set controllerManager.container.image.tag=${scale_controller_image_tag} \
+            --set manager.image.repository=${scale_controller_image_name} \
+            --set manager.image.tag=${scale_controller_image_tag} \
             --set alertReceiver.container.image.repository=${card_alert_receiver_image_name} \
             --set alertReceiver.container.image.tag=${card_alert_receiver_image_tag} \
             --set-file managementKubeconfig=${kubeconfig_file} \

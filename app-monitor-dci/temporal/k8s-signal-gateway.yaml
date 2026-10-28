@@ -36,7 +36,7 @@ spec:
         node-role.kubernetes.io/control-plane: ""
       containers:
       - name: worker
-        image: 'localhost/temporal-gateway:0.3.4'
+        image: 'localhost/temporal-gateway:1.0.0'
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -53,6 +53,8 @@ spec:
               optional: true
         - name: MAX_SIGNAL_BUF_SIZE
           value: "600"
+        - name: WORKFLOW_HEALTH_CHECK_INTERVAL_SEC
+          value: "300"
 ---
 apiVersion: v1
 kind: Service

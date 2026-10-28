@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -23,11 +9,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"os"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"strconv"
 	"strings"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,7 +48,7 @@ type ConnectEndpointEventPredicate struct {
 // the user.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.24.1/pkg/reconcile
 func (r *ConnectEndpointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var err error
 	var resultErr error
@@ -153,11 +140,14 @@ func (r *ConnectEndpointReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	if err != nil {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = false
 		resultErr = err
 	} else if bProcFlag {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = false
 	} else {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = true
 
 		if bExclusiveFlag {
@@ -169,6 +159,7 @@ func (r *ConnectEndpointReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 	log.Info(cMyFuncName + " return." +
 		" stCtrlResult.Requeue: " + strconv.FormatBool(stCtrlResult.Requeue) +
 		", stCtrlResult.RequeueAfter: " + stCtrlResult.RequeueAfter.String() +
@@ -202,7 +193,7 @@ func (ConnectEndpointEventPredicate) Update(e event.UpdateEvent) bool {
 	return bProcFlag
 }
 
-func (ConnectEndpointEventPredicate) Create(e event.CreateEvent) bool {
+func (ConnectEndpointEventPredicate) Create(_ event.CreateEvent) bool {
 	return true
 }
 
@@ -963,8 +954,8 @@ func (r *ConnectEndpointReconciler) updAppStateCRList(
 
 			// Restoration of deletion status information
 			stStatusTo := examplecomv1.ToDeploymentStatus{}
-			for iBfrToIndex, _ := range pstBeforeCRData.Status.To {
-				for iBfrToPodIndex, _ := range pstBeforeCRData.Status.To[iBfrToIndex].ToPod {
+			for iBfrToIndex := range pstBeforeCRData.Status.To {
+				for iBfrToPodIndex := range pstBeforeCRData.Status.To[iBfrToIndex].ToPod {
 					stToPod := pstBeforeCRData.Status.To[iBfrToIndex].ToPod[iBfrToPodIndex]
 					if stToPod.PodRef.Name == dciAppStateCRData.Name &&
 						stToPod.PodRef.Namespace == dciAppStateCRData.Namespace {
@@ -973,7 +964,7 @@ func (r *ConnectEndpointReconciler) updAppStateCRList(
 						stStatusTo.ToPod = append(stStatusTo.ToPod, stToPod)
 
 						bDeploymentHitFlag := false
-						for iaftToIndex, _ := range pstCRData.Status.To {
+						for iaftToIndex := range pstCRData.Status.To {
 							if pstCRData.Status.To[iaftToIndex].DeploymentRef ==
 								stStatusTo.DeploymentRef {
 								pstCRData.Status.To[iaftToIndex].ToPod =
@@ -1255,7 +1246,6 @@ func (r *ConnectEndpointReconciler) reconcileDelete(
 	log.Info(cMyFuncName + " Start.")
 
 	for range 1 {
-
 		var pstBaseCRDData client.Patch
 		bConfiguredFlag := false
 		var bFuncRetFlag bool
@@ -1277,7 +1267,6 @@ func (r *ConnectEndpointReconciler) reconcileDelete(
 
 			pstCRData.Status.Condition = examplecomv1.NotConfigured
 			log.Info(cMyFuncName + " changed the condition in the status area of the ConnectEndpointCR to NotConfigured.")
-
 		}
 		if examplecomv1.NotConfigured == pstCRData.Status.Condition {
 			err = r.delAppStateCRList(ctx, log, pstCRData)

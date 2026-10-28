@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -28,6 +14,9 @@ const (
 
 	// requeue interval for pending NodeScalingRequest
 	requeueIntervalNodeScalingRequestPending = 15 * time.Second
+
+	// requeue interval for waiting for scaling MachineDeployment of NodeScalingRequest
+	requeueIntervalNodeScalingRequestWaitingScaling = 1 * time.Minute
 
 	// polling interval to sync resource version for custom resource after updating status of the resource
 	pollingIntervalSyncResourceVersion = 100 * time.Millisecond
@@ -107,6 +96,7 @@ const (
 	eventReasonScalingUpCompleted        = "ScalingUpCompleted"
 	eventReasonCompleted                 = "Completed"
 	eventReasonExpired                   = "Expired"
+	eventReasonNoSelectorsBuilt          = "NoSelectorsBuilt"
 )
 
 // Event reasons for Finalizer
@@ -121,6 +111,14 @@ const (
 
 	eventReasonFinalizerScalingUpCompleted   = "FinalizerScalingUpCompleted"
 	eventReasonFinalizerScalingDownCompleted = "FinalizerScalingDownCompleted"
+)
+
+// Event actions for Reconcile
+// TODO: With recent Kubernetes upgrades(from v1.34.x to v1.36.x), Event action can be set; for now,
+// we keep it as `Reconciling` to avoid relying on reason as a temporary workaround.
+// In the future, this should be updated to proper values, including reason.
+const (
+	eventActionReconciling = "Reconciling"
 )
 
 // Definitions for DeviceTaintRule

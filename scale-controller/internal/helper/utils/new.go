@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package utils
 
 import (
@@ -90,6 +76,8 @@ func NewDCIMachineTemplateFromNodeScalingRequest(
 
 // NewDockerMachineTemplateFromNodeScalingRequest is a function to create a DockerMachineTemplate resource
 // from NodeScalingRequest.
+//
+//nolint:staticcheck // capdockerv1.DockerMachineTemplate is deprecated but still used because this is only for test purpose
 func NewDockerMachineTemplateFromNodeScalingRequest(
 	_, namespace string, nsr *scalev1.NodeScalingRequest,
 ) (*capdockerv1.DockerMachineTemplate, error) {
@@ -119,7 +107,23 @@ func NewDockerMachineTemplateFromNodeScalingRequest(
 // newMachineDeployment is a function to create a MachineDeployment resource.
 func newMachineDeployment(
 	name, namespace, machineTemplateName, createdByName, createdByNamespace string, replicas *int32, original *capiv1.MachineDeployment,
-) *capiv1.MachineDeployment {
+) (*capiv1.MachineDeployment, error) {
+	if original == nil ||
+		!original.Spec.Template.Spec.Bootstrap.ConfigRef.IsDefined() ||
+		original.Spec.Selector.MatchLabels == nil {
+		// this case is only for failsafe
+		return nil, fmt.Errorf("expected MachineDeployment and its parameters are not nil, but got nil: %v", original)
+	}
+
+	// Deep copy original MachineDeployment template and update only InfrastructureRef name
+	newTemplate := original.Spec.Template.DeepCopy()
+	if newTemplate == nil {
+		// this case is only for failsafe
+		return nil, errors.New("failed to deep copy MachineDeployment template")
+	}
+	newTemplate.Spec.InfrastructureRef.Name = machineTemplateName
+
+	// Return new MachineDeployment with updated parameters
 	return &capiv1.MachineDeployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: original.APIVersion,
@@ -141,26 +145,9 @@ func newMachineDeployment(
 					capiv1.ClusterNameLabel: original.Spec.Selector.MatchLabels[capiv1.ClusterNameLabel],
 				},
 			},
-			Template: capiv1.MachineTemplateSpec{
-				Spec: capiv1.MachineSpec{
-					Version:     original.Spec.Template.Spec.Version,
-					ClusterName: original.Spec.Template.Spec.ClusterName,
-					Bootstrap: capiv1.Bootstrap{
-						ConfigRef: capiv1.ContractVersionedObjectReference{
-							APIGroup: original.Spec.Template.Spec.Bootstrap.ConfigRef.APIGroup,
-							Kind:     original.Spec.Template.Spec.Bootstrap.ConfigRef.Kind,
-							Name:     original.Spec.Template.Spec.Bootstrap.ConfigRef.Name,
-						},
-					},
-					InfrastructureRef: capiv1.ContractVersionedObjectReference{
-						APIGroup: original.Spec.Template.Spec.InfrastructureRef.APIGroup,
-						Kind:     original.Spec.Template.Spec.InfrastructureRef.Kind,
-						Name:     machineTemplateName,
-					},
-				},
-			},
+			Template: *newTemplate,
 		},
-	}
+	}, nil
 }
 
 // NewMachineDeploymentFromCardScalingRequest is a function to create a MachineDeployment resource
@@ -168,11 +155,9 @@ func newMachineDeployment(
 func NewMachineDeploymentFromCardScalingRequest(
 	csr *scalev1.CardScalingRequest, original *capiv1.MachineDeployment,
 ) (*capiv1.MachineDeployment, error) {
-	if csr == nil || original == nil ||
-		!original.Spec.Template.Spec.Bootstrap.ConfigRef.IsDefined() ||
-		original.Spec.Selector.MatchLabels == nil {
+	if csr == nil || csr.Status.NewDCIMachineInfo == nil {
 		// this case is only for failsafe
-		return nil, errors.New("expected CardScalingRequest and MachineDeployment are not nil, but got nil")
+		return nil, fmt.Errorf("expected CardScalingRequest and its NewDCIMachineInfo are not nil, but got nil: %v", csr)
 	}
 	return newMachineDeployment(
 		csr.Status.NewDCIMachineInfo.MachineDeploymentName,
@@ -182,7 +167,7 @@ func NewMachineDeploymentFromCardScalingRequest(
 		csr.Namespace,
 		ptr.To(int32(0)), // set 0 initially
 		original,
-	), nil
+	)
 }
 
 // NewMachineDeploymentFromNodeScalingRequest is a function to create a MachineDeployment resource
@@ -190,14 +175,11 @@ func NewMachineDeploymentFromCardScalingRequest(
 func NewMachineDeploymentFromNodeScalingRequest(
 	name, namespace, machineTemplateName string, nsr *scalev1.NodeScalingRequest, original *capiv1.MachineDeployment,
 ) (*capiv1.MachineDeployment, error) {
-	if nsr == nil || original == nil ||
-		!original.Spec.Template.Spec.Bootstrap.ConfigRef.IsDefined() ||
-		original.Spec.Selector.MatchLabels == nil {
+	if nsr == nil {
 		// this case is only for failsafe
-		return nil, fmt.Errorf("expected NodeScalingRequest(%p), MachineDeployment(%p) and its parameters are not nil, but got nil",
-			nsr, original)
+		return nil, errors.New("expected NodeScalingRequest is not nil, but got nil")
 	}
-	return newMachineDeployment(name, namespace, machineTemplateName, nsr.Name, nsr.Namespace, ptr.To(int32(1)), original), nil
+	return newMachineDeployment(name, namespace, machineTemplateName, nsr.Name, nsr.Namespace, ptr.To(int32(1)), original)
 }
 
 // GenerateServerSpecAfterScaling generates ServerSpec after scaling based on original ServerSpec and CardScalingRequest.

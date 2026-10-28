@@ -13,7 +13,7 @@ spec:
       control-plane: controller-manager
     {{- include "chart.selectorLabels" . | nindent 6 }}
   strategy:
-      {{- toYaml .Values.controllerManager.manager.strategy | nindent 4 }}
+      {{- toYaml .Values.controllerManager.strategy | nindent 4 }}
   template:
     metadata:
       labels:
@@ -39,6 +39,10 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 20
         name: manager
+        ports:
+        - containerPort: 8081
+          name: health
+          protocol: TCP
         readinessProbe:
           httpGet:
             path: /readyz
@@ -49,10 +53,12 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
+      nodeSelector: {{- toYaml .Values.controllerManager.nodeSelector | nindent 8 }}
       securityContext: {{- toYaml .Values.controllerManager.podSecurityContext | nindent
         8 }}
-      serviceAccountName: {{ include "chart.fullname" . }}-controller-manager
+      serviceAccountName: {{ include "chart.serviceAccountName" . }}
       terminationGracePeriodSeconds: 10
-      nodeSelector: {{- toYaml .Values.controllerManager.manager.nodeSelector | nindent 8 }}
-      tolerations: {{- toYaml .Values.controllerManager.manager.tolerations | nindent 8 }}
-      affinity: {{- toYaml .Values.controllerManager.manager.affinity | nindent 8 }}
+      tolerations: {{- toYaml .Values.controllerManager.tolerations | nindent 8 }}
+      topologySpreadConstraints: {{- toYaml .Values.controllerManager.topologySpreadConstraints
+        | nindent 8 }}
+      affinity: {{- toYaml .Values.controllerManager.affinity | nindent 8 }}

@@ -234,10 +234,6 @@ The failure recovery policies of the CardAlert Controller are broadly divided as
   - `NoSchedule`
     - Do not delete `Pod` using the target failure card, but ensure that the failure card is not allocated even if the target card is requested from any process after the `Pod` is deleted
 
-> **Note**
-`DeviceTaintRule` created when automatic replacement is disabled is currently an alpha feature and requires configuration such as feature-gate settings at Kubernetes startup.
-Additionally, the `DeviceTaintRule` resource definition in Kubernetes `v1.34.2` may change in `v1.35.0` and later versions, potentially causing it to not function as expected.
-
 When a `CardAlert` is created in the Workload Cluster, the CardAlert Controller detects it and, according to its settings, creates appropriate resources and performs failure recovery as described above.
 The following describes this flow. Note that as a specification of the CardAlert Controller, only one `CardAlert` can be processed at a time. Therefore, while a `CardAlert` is being processed, other `CardAlert` instances transition to a pending state and are requeued at regular intervals waiting for processing to begin.
 
@@ -268,10 +264,8 @@ When automatic replacement is disabled, the CardAlert Controller operates as fol
   - The Taint key and value are fixed values specified as `dra.example.com/unhealthy` and `Broken` respectively.
   - The Taint Effect is specified as `NoExecute` or `NoSchedule` retrieved from environment variables at startup.
   - `DeviceTaintRule` is a cluster-scoped resource, so `Namespace` is not specified.
-  - The DeviceSelector that sets the fault condition performs device matching based on GPU UUID using CEL syntax.
-    - For MIG UUID, only existence check is performed, and its value is not used.
-    - **NOTE**: Device matching based on CEL syntax may not be supported in Kubernetes `v1.35.0` and later.
-  - The CardAlert Controller does not delete `DeviceTaintRule` and expects manual deletion by users when faults are resolved.
+  - Find the matching device in `ResourceSlice` based on the UUID of the GPU set as having a failure, and set the target device in `DeviceSelector`.
+  - The CardAlert Controller does not delete `DeviceTaintRule` even after the failure is resolved, and expects manual deletion by the user after the failure is resolved.
 
 
 ### CardAlert AlertReceiver
@@ -331,21 +325,22 @@ cd /path/to/scale-controller
 ```
 
 ### Verified Environments
-- k8s: v1.34.2 (Management Cluster + Workload Cluster)
-- cluster-api: v1.12.0 (v1beta2 contract)
+- k8s: v1.36.1 (Management Cluster + Workload Cluster)
+- cluster-api: v1.14.0 (v1beta2 contract)
 - cert-manager: v1.19.2
 - calico: n/a
 
 ### Version for quick start
 
 Set following shell variables adjusting your environment.
+Set helm_chart_version, controller_img_tag, and receiver_img_tag to the values specified in the Helm chart.
 
 ```sh
-cluster_api_version=v1.12.0
+cluster_api_version=v1.14.0
 cert_manager_version=v1.19.2
-helm_chart_version=v0.3.0
-controller_img_tag=0.3.0
-receiver_img_tag=0.3.0
+helm_chart_version=v0.3.9
+controller_img_tag=0.3.9
+receiver_img_tag=0.3.9
 ```
 
 #### Setup of Management Cluster and Workload Cluster
@@ -360,16 +355,16 @@ export M_CLUSTER_NAME="fake-management"
 export CLUSTER_NAME="fake-cluster"
 # If you are in a proxy environment, run the following as needed
 export NO_PROXY=$NO_PROXY,172.18.0.0/16
-kind_image=kindest/node:v1.34.2
+kind_image=kindest/node:v1.36.1
 
 # Create Management Cluster using kind
 # If you do not need to specify the k8s image, the --image option is not required.
 kind create cluster -n ${M_CLUSTER_NAME} --image=${kind_image}
 
 # Deploy the Cluster API CRDs (Custom Resource Definitions) on the Management Cluster.
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/config/crd/bases/cluster.x-k8s.io_machinesets.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/config/crd/bases/cluster.x-k8s.io_machines.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machinesets.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machines.yaml
 
 # Deploy DCI Provider and Resource Pool Manager CRDs on the Management Cluster.
 path_to_capd=../cluster-api-provider-dci
@@ -412,15 +407,15 @@ kubectl patch dcimachine fake-worker-dci-machine-00 --type='json' -p="${patch_js
 kubectl get md fake-worker-md-00
 # expected results:
 # NAME                CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
-# fake-worker-md-00   fake-cluster               1                   1                                        3s    
+# fake-worker-md-00   fake-cluster               1                   1                                        2s    
 
 # Verify that OwnerReference is set for MachineSet and others
 kubectl get ms fake-worker-ms-00 -o jsonpath='{.metadata.ownerReferences}{"\n"}'
 # expected results:
-# [{"apiVersion":"cluster.x-k8s.io/v1beta2","blockOwnerDeletion":true,"controller":true,"kind":"MachineDeployment","name":"fake-worker-md-00","uid":"6973cc52-0ab5-41d1-add2-0e8dbf0c53ed"}]
+# [{"apiVersion":"cluster.x-k8s.io/v1beta2","blockOwnerDeletion":true,"controller":true,"kind":"MachineDeployment","name":"fake-worker-md-00","uid":"8c07d62d-6718-48e6-b3af-c975e86cfe5b"}]
 kubectl get dcimachine fake-worker-dci-machine-00 -o jsonpath='{.metadata.ownerReferences}{"\n"}'
 # expected results:
-# [{"apiVersion":"cluster.x-k8s.io/v1beta2","blockOwnerDeletion":true,"controller":true,"kind":"Machine","name":"fake-worker-machine-00","uid":"251ac098-c939-41c1-8998-20fe9d9c5431"}]
+# [{"apiVersion":"cluster.x-k8s.io/v1beta2","blockOwnerDeletion":true,"controller":true,"kind":"Machine","name":"fake-worker-machine-00","uid":"cfec50d7-0d61-4c34-8671-c8b28f15541d"}]
 ```
 
 **Note**: If the DCI Provider or Resource Pool Manager CRD files do not exist in the expected directory, generate them as described below.
@@ -444,7 +439,7 @@ envsubst < example/cluster-api/fake/workload/cluster.yaml | kw apply -f -
 kw get node
 # expected results:
 # NAME                         STATUS     ROLES           AGE   VERSION
-# fake-cluster-control-plane   NotReady   control-plane   7s    v1.34.2
+# fake-cluster-control-plane   NotReady   control-plane   8s    v1.36.1
 # fake-node-00                 Unknown    <none>          0s    
 # fake-node-control-plane-00   Unknown    <none>          0s    
 ```
@@ -463,6 +458,10 @@ To deploy the Scale Controller, the following preparations are required in advan
 Once these preparations are complete, install the Helm Chart with the following command.
 For details, refer to [helm/README.md](helm/README.md).
 
+Note:
+- `managementKubeconfig` default value in `values.yaml` is `dummy-kubeconfig` for local rendering/tests.
+- For production operation, always provide a real kubeconfig via `--set-file managementKubeconfig=...`.
+
 ##### Deploying the Scale Controller Using an Existing Helm Chart
 
 Deploy the Scale Controller from the Helm Chart with the following command.
@@ -480,8 +479,8 @@ helm install scale-controller ${path_to_helm_chart} \
     ${cluster_context} \
     --create-namespace \
     --namespace scale-controller-system \
-    --set controllerManager.container.image.repository=scale-controller \
-    --set controllerManager.container.image.tag=${helm_controller_image_tag} \
+    --set manager.image.repository=scale-controller \
+    --set manager.image.tag=${helm_controller_image_tag} \
     --set alertReceiver.container.image.repository=card-alert-receiver \
     --set alertReceiver.container.image.tag=${helm_receiver_image_tag} \
     --set-file managementKubeconfig=${path_to_management_kubeconfig}
@@ -510,8 +509,8 @@ helm install scale-controller ${path_to_helm_chart} \
     ${cluster_context} \
     --create-namespace \
     --namespace scale-controller-system \
-    --set controllerManager.container.image.repository=scale-controller \
-    --set controllerManager.container.image.tag=${helm_controller_image_tag} \
+    --set manager.image.repository=scale-controller \
+    --set manager.image.tag=${helm_controller_image_tag} \
     --set alertReceiver.container.image.repository=card-alert-receiver \
     --set alertReceiver.container.image.tag=${helm_receiver_image_tag} \
     --set-file managementKubeconfig=${path_to_management_kubeconfig}
@@ -542,10 +541,10 @@ Deploy cert-manager, which issues certificates for webhooks, and make sure that 
 kw apply -f https://github.com/cert-manager/cert-manager/releases/download/${cert_manager_version}/cert-manager.yaml
 kw get pod -n cert-manager
 # expected results:
-# NAME                                      READY   STATUS    RESTARTS   AGE
-# cert-manager-79559475b4-sv574             1/1     Running   0          19s
-# cert-manager-cainjector-966fc8fbc-5nxh6   1/1     Running   0          19s
-# cert-manager-webhook-854cf5f458-4h9ss     1/1     Running   0          19s
+# NAME                                       READY   STATUS    RESTARTS   AGE
+# cert-manager-56cbc66766-5rmnk              1/1     Running   0          20s
+# cert-manager-cainjector-7cf74f998f-kf66j   1/1     Running   0          20s
+# cert-manager-webhook-77d44c5f9b-29rkz      1/1     Running   0          20s
 ```
 
 #### Building the Scale Controller
@@ -562,11 +561,11 @@ make docker-build
 docker images ${IMG}
 # expected results:
 # IMAGE                    ID             DISK USAGE   CONTENT SIZE   EXTRA
-# scale-controller:0.3.0   a69fe6e286de       82.4MB             0B        
+# scale-controller:0.3.9   24d68e75516c       78.7MB             0B      
 docker images ${ALERT_RECEIVER_IMG}
 # expected results:
 # IMAGE                       ID             DISK USAGE   CONTENT SIZE   EXTRA
-# card-alert-receiver:0.3.0   7a46ede9b1d8       43.6MB             0B
+# card-alert-receiver:0.3.9   44cc585a4a98       40.6MB             0B        
 ```
 
 ```sh
@@ -582,7 +581,7 @@ If you want to build the image with buildah instead of docker, use `buildah-buil
 Set up authentication credentials for the Scale Controller on the Management Cluster.
 
 ```sh
-kubectl apply -f example/rbac/rbac-in-management-cluster.yaml
+kubectl apply -f example/rbac/dci/rbac-in-management-cluster.yaml
 ```
 
 Create a kubeconfig from the generated credentials so that the Scale Controller can access the Management Cluster.
@@ -672,10 +671,10 @@ Verify that a `Node` has been added.
 kw get node
 # expected results:
 # NAME                         STATUS     ROLES           AGE     VERSION
-# fake-cluster-control-plane   Ready      control-plane   6m      v1.34.2
-# fake-node-00                 NotReady   <none>          5m53s   
-# fake-node-01                 Unknown    <none>          22s     
-# fake-node-control-plane-00   NotReady   <none>          5m53s   
+# fake-cluster-control-plane   Ready      control-plane   8m11s   v1.36.1
+# fake-node-00                 NotReady   <none>          8m3s    
+# fake-node-01                 Unknown    <none>          35s     
+# fake-node-control-plane-00   NotReady   <none>          8m3s    
 ```
 
 Delete the `NodeScalingRequest`.
@@ -708,10 +707,10 @@ Verify that both `machinedeployment.spec.replicas` and `machineset.spec.replicas
 kubectl get md,ms
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE     VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   2                                        7m54s   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   2                                        9m44s   
 
 # NAME                                            CLUSTER        DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   AGE     VERSION
-# machineset.cluster.x-k8s.io/fake-worker-ms-00   fake-cluster   1                                                    7m52s   v1.34.2
+# machineset.cluster.x-k8s.io/fake-worker-ms-00   fake-cluster   1                                                    9m44s   v1.36.1
 ```
 
 To simulate the operation of Cluster API, manually delete the dummy `Node` and change `machinedeployment.status.readyReplicas` to 1.
@@ -727,7 +726,7 @@ Verify that `nodescalingrequest.status.phase` becomes `Deleted`.
 kw get nsr
 # expected results:
 # NAME         TYPE     PHASE     AGE
-# scale-down   delete   Deleted   61s
+# scale-down   delete   Deleted   112s
 ```
 
 Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` has decreased to 1.
@@ -735,11 +734,11 @@ Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.read
 ```sh
 kubectl get md,dcimachinetemplate
 # expected results:
-# NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE     VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        9m18s   
+# NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        11m   
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   9m16s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   12m
 ```
 
 Verify that a `Node` has been removed.
@@ -747,10 +746,10 @@ Verify that a `Node` has been removed.
 ```sh
 kw get node
 # expected results:
-# NAME                         STATUS     ROLES           AGE     VERSION
-# fake-cluster-control-plane   Ready      control-plane   7m3s    v1.34.2
-# fake-node-00                 NotReady   <none>          6m56s   
-# fake-node-control-plane-00   NotReady   <none>          6m56s   
+# NAME                         STATUS     ROLES           AGE   VERSION
+# fake-cluster-control-plane   Ready      control-plane   11m   v1.36.1
+# fake-node-00                 NotReady   <none>          11m   
+# fake-node-control-plane-00   NotReady   <none>          11m   
 ```
 
 Delete the `NodeScalingRequest`.
@@ -782,12 +781,12 @@ Confirm that a new `MachineDeployment` and `DCIMachineTemplate` are created, and
 kubectl get md,dcimachinetemplate
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        10m   
-# machinedeployment.cluster.x-k8s.io/worker-md-uw350     fake-cluster               1                                                            11s   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        12m   
+# machinedeployment.cluster.x-k8s.io/worker-md-00evb     fake-cluster               1                                                            10s   
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   10m
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-mk55f           12s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-37os8           10s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   13m
 ```
 
 Verify that the `.spec.template.spec` of the newly created `DCIMachineTemplate` matches the `spec` of the `NodeScalingRequest`.
@@ -803,7 +802,7 @@ compare_string() {
     echo $2
   fi
 }
-export INFRA_TEMPLATE_NAME=worker-dmt-mk55f # Adjust to your environment
+export INFRA_TEMPLATE_NAME=worker-dmt-37os8 # Adjust to your environment
 compare_string \
   $(kubectl get dcimachinetemplate ${INFRA_TEMPLATE_NAME} -o jsonpath='{.spec.template.spec.serverSpec}') \
   $(kw get nsr scale-up-new-md -o jsonpath='{.spec.serverSpec}')
@@ -819,7 +818,7 @@ compare_string \
 Also, confirm that the `.spec.template.spec.infrastructureRef` of the newly created `MachineDeployment` is set to the name of the newly created `DCIMachineTemplate`.
 
 ```sh
-export MD_NAME=worker-md-uw350　# Adjust to your environment
+export MD_NAME=worker-md-00evb # Adjust to your environment
 compare_string \
   $(kubectl get md ${MD_NAME} -o jsonpath='{.spec.template.spec.infrastructureRef.name}') \
   ${INFRA_TEMPLATE_NAME}
@@ -869,7 +868,7 @@ Verify that `nodescalingrequest.status.phase` becomes `Created`.
 kw get nsr
 # expected results:
 # NAME              TYPE     PHASE     AGE
-# scale-up-new-md   create   Created   5m20s
+# scale-up-new-md   create   Created   2m32s
 ```
 
 Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` has increased to 1.
@@ -878,12 +877,12 @@ Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.read
 kubectl get md,dcimachinetemplate
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE     VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        14m     
-# machinedeployment.cluster.x-k8s.io/worker-md-uw350     fake-cluster               1                   1                                        3m49s   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        15m     
+# machinedeployment.cluster.x-k8s.io/worker-md-00evb     fake-cluster               1                   1                                        2m47s   
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   14m
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-mk55f           3m50s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-37os8           2m47s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   16m
 ```
 
 Verify that a `Node` has been removed.
@@ -891,11 +890,11 @@ Verify that a `Node` has been removed.
 ```sh
 kw get node
 # expected results:
-# NAME                         STATUS     ROLES           AGE     VERSION
-# fake-cluster-control-plane   Ready      control-plane   9m45s   v1.34.2
-# fake-node-00                 NotReady   <none>          9m38s   
-# fake-node-02                 NotReady   <none>          66s     
-# fake-node-control-plane-00   NotReady   <none>          9m38s   
+# NAME                         STATUS     ROLES           AGE   VERSION
+# fake-cluster-control-plane   Ready      control-plane   15m   v1.36.1
+# fake-node-00                 NotReady   <none>          15m   
+# fake-node-02                 Unknown    <none>          38s   
+# fake-node-control-plane-00   NotReady   <none>          15m   
 ```
 
 Delete the `NodeScalingRequest`.
@@ -929,13 +928,13 @@ Verify that the `MachineDeployment` and `MachineSet` have been deleted.
 kubectl get md,ms,dcimachinetemplate
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        15m   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        17m   
 
 # NAME                                            CLUSTER        DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   AGE   VERSION
-# machineset.cluster.x-k8s.io/fake-worker-ms-00   fake-cluster   1                                                    15m   v1.34.2
+# machineset.cluster.x-k8s.io/fake-worker-ms-00   fake-cluster   1                                                    17m   v1.36.1
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   15m
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   18m
 ```
 
 To simulate the operation of Cluster API, manually delete the dummy `Machine` and `Node` resources.
@@ -951,7 +950,7 @@ Verify that `nodescalingrequest.status.phase` becomes `Deleted`.
 kw get nsr
 # expected results:
 # NAME         TYPE     PHASE     AGE
-# scale-down   delete   Deleted   98s
+# scale-down   delete   Deleted   46s
 ```
 
 Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` has been removed.
@@ -960,10 +959,10 @@ Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.read
 kubectl get md,dcimachinetemplate
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        16m   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        18m   
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   16m
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   19m
 ```
 
 Verify that a Node has been removed.
@@ -972,9 +971,9 @@ Verify that a Node has been removed.
 kw get node
 # expected results:
 # NAME                         STATUS     ROLES           AGE   VERSION
-# fake-cluster-control-plane   Ready      control-plane   10m   v1.34.2
-# fake-node-00                 NotReady   <none>          10m   
-# fake-node-control-plane-00   NotReady   <none>          10m   
+# fake-cluster-control-plane   Ready      control-plane   17m   v1.36.1
+# fake-node-00                 NotReady   <none>          17m   
+# fake-node-control-plane-00   NotReady   <none>          17m   
 ```
 
 Delete the `NodeScalingRequest`.

@@ -106,10 +106,10 @@ ___
 ### e2e
 
 You should install following tools at first:
-- kind
-- clusterctl: v1.12.0+
+- kind: v0.32.0+
+- clusterctl: v1.14.0+
 - helm
-- kubebuilder
+- kubebuilder: v4.15.0+
 
 You can execute e2e test with kind clusters by following commands:
 

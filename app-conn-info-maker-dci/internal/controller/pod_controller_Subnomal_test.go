@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -188,9 +174,9 @@ var _ = Describe("Pod Controller", func() {
 		})
 
 		It("Pod Create", func() {
-			By("Test02-2: CreatePod Phase is Not Running")
+			By("Test03-1: CreatePod Conditions is Not Ready")
 			// ------------------------------
-			//	Test03-1 CreatePod Phase is Not Running
+			//	Test03-1 CreatePod Conditions is Not Ready
 			//  X-A,Y-C,X-Y (A=Replicas 1to2)
 			//  Y-None
 			//  In-X,Out-Y

@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package testutils
 
 import (
@@ -20,7 +6,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	resourcev1 "k8s.io/api/resource/v1alpha3"
+	resourcev1 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -68,6 +54,14 @@ func CleanupNodeResources(
 	return c.DeleteAllOf(ctx, &corev1.Node{})
 }
 
+// CreateDeviceTaintRuleResource creates a DeviceTaintRule resource in the cluster.
+func CreateDeviceTaintRuleResource(
+	ctx context.Context, c client.Client, name, key, val string, effect resourcev1.DeviceTaintEffect,
+	driverName, poolName, deviceName *string,
+) error {
+	return c.Create(ctx, NewDeviceTaintRule(name, key, val, effect, driverName, poolName, deviceName))
+}
+
 // CleanupDeviceTaintRuleResource deletes a DeviceTaintRule resource from the cluster.
 func CleanupDeviceTaintRuleResource(
 	ctx context.Context, c client.Client, name string,
@@ -77,9 +71,26 @@ func CleanupDeviceTaintRuleResource(
 
 // CleanupDeviceTaintRuleResources deletes all DeviceTaintRule resources in the cluster.
 func CleanupDeviceTaintRuleResources(
-	ctx context.Context, c client.Client, namespace string,
+	ctx context.Context, c client.Client,
 ) error {
-	return c.DeleteAllOf(ctx, &resourcev1.DeviceTaintRule{}, client.InNamespace(namespace))
+	return c.DeleteAllOf(ctx, &resourcev1.DeviceTaintRule{})
+}
+
+// CreateResourceSliceResource creates a ResourceSlice resource in the cluster.
+func CreateResourceSliceResource(
+	ctx context.Context, c client.Client, name, driverName, poolName string, devices map[string]map[string]string,
+) error {
+	if len(devices) == 0 {
+		return errors.New("expected devices to be non-empty, but got empty")
+	}
+	return c.Create(ctx, NewResourceSlice(name, driverName, poolName, devices))
+}
+
+// CleanupResourceSlices deletes all ResourceSlices resources in the specified namespace.
+func CleanupResourceSliceResources(
+	ctx context.Context, c client.Client,
+) error {
+	return c.DeleteAllOf(ctx, &resourcev1.ResourceSlice{})
 }
 
 // CreateMachineResource creates a Machine resource in the cluster.
@@ -180,6 +191,8 @@ func CreateDockerMachineTemplateResource(
 }
 
 // CleanupDockerMachineTemplateResource deletes a DockerMachineTemplate resource from the cluster.
+//
+//nolint:staticcheck // capdockerv1.DockerMachineTemplate is deprecated but still used because this is only for test purpose
 func CleanupDockerMachineTemplateResource(
 	ctx context.Context, c client.Client, name, namespace string,
 ) error {
@@ -187,6 +200,8 @@ func CleanupDockerMachineTemplateResource(
 }
 
 // CleanupDockerMachineTemplateResources deletes all DockerMachineTemplate resources in the specified namespace.
+//
+//nolint:staticcheck // capdockerv1.DockerMachineTemplate is deprecated but still used because this is only for test purpose
 func CleanupDockerMachineTemplateResources(
 	ctx context.Context, c client.Client, namespace string,
 ) error {
@@ -239,20 +254,6 @@ func CleanupLogicalServerResources(
 	ctx context.Context, c client.Client, namespace string,
 ) error {
 	return c.DeleteAllOf(ctx, &rpmv1.LogicalServer{}, client.InNamespace(namespace))
-}
-
-// CleanupMachineAlertResource deletes a MachineAlert resource from the cluster.
-func CleanupMachineAlertResource(
-	ctx context.Context, c client.Client, name, namespace string,
-) error {
-	return cleanupResource(ctx, c, NewNamespacedName(name, namespace), &rpmv1.MachineAlert{})
-}
-
-// CleanupMachineAlertResources deletes all MachineAlert resources in the specified namespace.
-func CleanupMachineAlertResources(
-	ctx context.Context, c client.Client, namespace string,
-) error {
-	return c.DeleteAllOf(ctx, &rpmv1.MachineAlert{}, client.InNamespace(namespace))
 }
 
 // PatchMachineDeploymentReplicas patches the .Replicas field of the specified MachineDeployment.
@@ -425,6 +426,40 @@ func PatchLogicalServerState(
 	return c.Status().Patch(ctx, ls, client.MergeFrom(lsLast))
 }
 
+func PatchLogicalServerAppliedServerSpec(
+	ctx context.Context, c client.Client, name, namespace string, serverSpec *rpmv1.ServerSpec,
+) error {
+	ls := &rpmv1.LogicalServer{}
+	if err := c.Get(ctx, NewNamespacedName(name, namespace), ls); err != nil {
+		return err
+	}
+	lsLast := ls.DeepCopy()
+	if ls.Status.AppliedSpec == nil {
+		ls.Status.AppliedSpec = &rpmv1.AppliedSpec{
+			ServerSpec: rpmv1.AppliedServerSpec{
+				GPUs: []rpmv1.AppliedGPUSpec{
+					{
+						Required:    true,
+						Model:       serverSpec.GPU.Model,
+						Num:         serverSpec.GPU.Num,
+						Assignments: serverSpec.GPU.Assignments,
+					},
+				},
+			},
+		}
+	} else {
+		ls.Status.AppliedSpec.ServerSpec.GPUs = []rpmv1.AppliedGPUSpec{
+			{
+				Required:    true,
+				Model:       serverSpec.GPU.Model,
+				Num:         serverSpec.GPU.Num,
+				Assignments: serverSpec.GPU.Assignments,
+			},
+		}
+	}
+	return c.Status().Patch(ctx, ls, client.MergeFrom(lsLast))
+}
+
 // PatchLogicalServerType patches the .status.appliedSpec.type field of the specified LogicalServer.
 func PatchLogicalServerType(
 	ctx context.Context, c client.Client, name, namespace string, appliedType rpmv1.AppliedServerType,
@@ -524,4 +559,18 @@ func CleanupCardAlertResourcesWithoutFinalizers(
 	ctx context.Context, c client.Client, namespace string,
 ) error {
 	return c.DeleteAllOf(ctx, &scalev1.CardAlert{}, client.InNamespace(namespace))
+}
+
+// CleanupMachineAlertResource deletes a MachineAlert resource from the cluster.
+func CleanupMachineAlertResource(
+	ctx context.Context, c client.Client, name, namespace string,
+) error {
+	return cleanupResource(ctx, c, NewNamespacedName(name, namespace), &rpmv1.MachineAlert{})
+}
+
+// CleanupMachineAlertResources deletes all MachineAlert resources in the specified namespace.
+func CleanupMachineAlertResources(
+	ctx context.Context, c client.Client, namespace string,
+) error {
+	return c.DeleteAllOf(ctx, &rpmv1.MachineAlert{}, client.InNamespace(namespace))
 }

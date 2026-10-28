@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -26,7 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	corev1 "k8s.io/api/core/v1"
-	resourcev1 "k8s.io/api/resource/v1alpha3"
+	resourcev1 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -34,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 
 	capiv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -486,17 +472,6 @@ var _ = Describe("CardAlert Controller Methods directly calling", Label("ca", "m
 				}
 			})
 		})
-
-		It("should unsuccessfully call createCELExpression with invalid cards", func() {
-			By("calling createCELExpression", func() {
-				var (
-					cards              = []scalev1.CardInfo{}
-					emptyCELExpression = ""
-				)
-				celExpression := createCELExpression(cards)
-				Expect(celExpression).To(Equal(emptyCELExpression))
-			})
-		})
 	})
 })
 
@@ -860,10 +835,55 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 					Num:   int32(1),
 				},
 			)
+			resourceSliceName = "test-resource-slice"
+			driverName        = "nvidia-driver"
+			poolName          = nodeName
+			devices           = map[string]map[string]string{
+				"device1": {
+					"uuid": uuids[0],
+				},
+				"device2": {
+					"uuid": uuids[1],
+				},
+				"device3": {
+					"uuid": uuids[2],
+				},
+			}
+			migUUIDs = []string{
+				"mig-uuid-1",
+				"mig-uuid-2",
+				"mig-uuid-3",
+			}
+			migResourceSliceName = "test-mig-resource-slice"
+			migDevices           = map[string]map[string]string{
+				"mig-device1": {
+					"parentUUID": uuids[0],
+					"uuid":       migUUIDs[0],
+				},
+				"mig-device2": {
+					"parentUUID": uuids[0],
+					"uuid":       migUUIDs[1],
+				},
+				"mig-device3": {
+					"parentUUID": uuids[1],
+					"uuid":       migUUIDs[2],
+				},
+			}
+			singleResourceSliceName = "test-single-resource-slice"
+			singleDevices           = map[string]map[string]string{
+				"single-device1": {
+					"uuid": uuids[0],
+				},
+				"dummy-device1": {
+					"dummyKey": "dummyValue",
+				},
+			}
 		)
 
 		BeforeEach(func() {
 			Expect(testutils.CreateNodeResource(ctx, k8sClientWorkload, nodeName, clusterName, clusterNamespace, machineName)).To(Succeed())
+			Expect(testutils.CreateResourceSliceResource(ctx, k8sClientWorkload, resourceSliceName, driverName, poolName, devices)).To(Succeed())
+			Expect(testutils.CreateResourceSliceResource(ctx, k8sClientWorkload, migResourceSliceName, driverName, poolName, migDevices)).To(Succeed())
 			Expect(testutils.CreateMachineResource(ctx, k8sClientManagement, machineName, machineNamespace, mdName, clusterName)).To(Succeed())
 			Expect(testutils.CreateMachineDeploymentResource(ctx, k8sClientManagement, mdName, mdNamespace, clusterName, capiv1.GroupVersion.Group, templateKind, dciMachineTemplateName, nil)).To(Succeed())
 			Expect(testutils.CreateDCIMachineResource(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, location, "", serverSpec)).To(Succeed())
@@ -873,11 +893,13 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			Expect(testutils.PatchDCIMachineLogicalServerRef(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, logicalServerName, logicalServerNamespace)).To(Succeed())
 			Expect(testutils.PatchMachineInfrastructureRef(ctx, k8sClientManagement, machineName, machineNamespace, dciMachineName, dciMachineNamespace)).To(Succeed())
 			Expect(testutils.PatchLogicalServerState(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.LogicalServerStateProvisioned)).To(Succeed())
+			Expect(testutils.PatchLogicalServerAppliedServerSpec(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, serverSpec)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			Expect(testutils.CleanupNodeResources(ctx, k8sClientWorkload)).To(Succeed())
-			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload, caNamespace)).To(Succeed())
+			Expect(testutils.CleanupResourceSliceResources(ctx, k8sClientWorkload)).To(Succeed())
+			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload)).To(Succeed())
 			Expect(testutils.CleanupMachineResources(ctx, k8sClientManagement, machineNamespace)).To(Succeed())
 			Expect(testutils.CleanupMachineDeploymentResources(ctx, k8sClientManagement, mdNamespace)).To(Succeed())
 			Expect(testutils.CleanupDCIMachineResources(ctx, k8sClientManagement, dciMachineNamespace)).To(Succeed())
@@ -1213,14 +1235,10 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			})
 		})
 
-		It("should successfully reconcile when auto replacement is disabled and the number of target GPU cards is over 1", func() {
-			const caName = "test-ca-disable-auto-replace-multiple-gpu-uuids"
+		It("should successfully reconcile when auto replacement is disabled with no valid ResourceSlice", func() {
+			const caName = "test-ca-disable-auto-replace-with-no-valid-resource-slice"
 			var (
 				cards = []scalev1.CardInfo{
-					{
-						Model:   model,
-						GPUUUID: uuids[0],
-					},
 					{
 						Model:   model,
 						GPUUUID: uuids[1],
@@ -1230,7 +1248,8 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			)
 			// Setup for this test case
 			By("setting up resources for test case", func() {
-				Expect(testutils.PatchLogicalServerType(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.AppliedServerTypeComposed)).To(Succeed())
+				Expect(testutils.CleanupResourceSliceResources(ctx, k8sClientWorkload)).To(Succeed())
+				Expect(testutils.CreateResourceSliceResource(ctx, k8sClientWorkload, singleResourceSliceName, driverName, poolName, singleDevices)).To(Succeed())
 			})
 			// Setup before reconcile
 			r := newCaReconciler(nil, nil)
@@ -1247,18 +1266,6 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 				Expect(executeCaInitializing(r, caName, caNamespace)).To(Succeed())
 				Expect(executeCaCreatingTaintResource(r, caName, caNamespace)).To(Succeed())
 				Expect(executeCaCompleted(r, caName, caNamespace)).To(Succeed())
-			})
-			By("asserting the CEL expression in DeviceTaintRule", func() {
-				ca := &scalev1.CardAlert{}
-				Expect(k8sClientWorkload.Get(ctx, testutils.NewNamespacedName(caName, caNamespace), ca)).To(Succeed())
-				dtrName := ca.Status.ResourceRef.Name
-				dtrNamespace := ca.Status.ResourceRef.Namespace
-				celExpr := fmt.Sprintf("cel.bind(%s, device.attributes['%s'], %s.uuid=='%s'||%s.uuid=='%s')",
-					deviceTaintRuleDevice, deviceTaintRuleCELLabelGPUNvidia,
-					deviceTaintRuleDevice, cards[0].GPUUUID, deviceTaintRuleDevice, cards[1].GPUUUID)
-				dtr := &resourcev1.DeviceTaintRule{}
-				Expect(k8sClientWorkload.Get(ctx, testutils.NewNamespacedName(dtrName, dtrNamespace), dtr)).To(Succeed())
-				Expect(dtr.Spec.DeviceSelector.Selectors[0].CEL.Expression).To(Equal(celExpr))
 			})
 			// Delete CardAlert
 			Expect(deleteCardAlertResource(ctx, caName, caNamespace)).To(Succeed())
@@ -1269,7 +1276,65 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			})
 		})
 
-		It("should successfully reconcile when auto replacement is disabled and the number of target MIG cards is over 1", func() {
+		It("should successfully reconcile when auto replacement is disabled with the number of target GPU cards is over 1", func() {
+			const caName = "test-ca-disable-auto-replace-multiple-gpu-uuids"
+			var (
+				cards = []scalev1.CardInfo{
+					{
+						Model:   model,
+						GPUUUID: uuids[0],
+					},
+					{
+						Model:   model,
+						GPUUUID: uuids[2],
+					},
+				}
+				source = scalev1.WebhookReceiverOnTenant
+			)
+			// Setup for this test case
+			By("setting up resources for test case", func() {
+				Expect(testutils.PatchLogicalServerType(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.AppliedServerTypeComposed)).To(Succeed())
+			})
+			// Setup before reconcile
+			r := newCaReconciler(nil, nil)
+			By("setting up auto replacement disabled", func() {
+				r.enableAutoReplace = false
+			})
+			By("creating CardAlert", func() {
+				ca := testutils.NewCardAlert(caName, caNamespace, nodeName, cards, source)
+				Expect(k8sClientWorkload.Create(ctx, ca)).To(Succeed())
+			})
+			// Reconcile
+			By("executing reconcile", func() {
+				Expect(executeCaInitial(r, caName, caNamespace)).To(Succeed())
+				Expect(executeCaInitializing(r, caName, caNamespace)).To(Succeed())
+				Expect(executeCaCreatingTaintResource(r, caName, caNamespace)).To(Succeed())
+				Expect(executeCaCompleted(r, caName, caNamespace)).To(Succeed())
+			})
+			By("asserting the created DeviceTaintRule", func() {
+				dtrList := &resourcev1.DeviceTaintRuleList{}
+				Expect(k8sClientWorkload.List(ctx, dtrList)).To(Succeed())
+				Expect(dtrList.Items).To(HaveLen(4))
+				for idx := range dtrList.Items {
+					dtr := &dtrList.Items[idx]
+					Expect(dtr.Spec.DeviceSelector.Driver).To(HaveValue(Equal(driverName)))
+					Expect(dtr.Spec.DeviceSelector.Pool).To(HaveValue(Equal(poolName)))
+					Expect(dtr.Spec.DeviceSelector.Device).To(SatisfyAny(
+						HaveValue(Equal("device1")), HaveValue(Equal("device3")),
+						HaveValue(Equal("mig-device1")), HaveValue(Equal("mig-device2")),
+					))
+				}
+			})
+			// Delete CardAlert
+			Expect(deleteCardAlertResource(ctx, caName, caNamespace)).To(Succeed())
+			// Finalize
+			By("executing finalize", func() {
+				Expect(finalizeCaCompleted(r, caName, caNamespace)).To(Succeed())
+				Expect(finalizeCaFinalized(r, caName, caNamespace)).To(Succeed())
+			})
+		})
+
+		It("should successfully reconcile when auto replacement is disabled with the number of target MIG cards is over 1", func() {
 			const caName = "test-ca-disable-auto-replace-multiple-mig-uuids"
 			var (
 				cards = []scalev1.CardInfo{
@@ -1277,15 +1342,15 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 						Model:   model,
 						GPUUUID: uuids[0],
 						MIGUUIDs: []string{
-							"mig-uuid-1",
-							"mig-uuid-2",
+							migUUIDs[0],
+							migUUIDs[1],
 						},
 					},
 					{
 						Model:   model,
 						GPUUUID: uuids[1],
 						MIGUUIDs: []string{
-							"mig-uuid-3",
+							migUUIDs[2],
 						},
 					},
 				}
@@ -1311,17 +1376,19 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 				Expect(executeCaCreatingTaintResource(r, caName, caNamespace)).To(Succeed())
 				Expect(executeCaCompleted(r, caName, caNamespace)).To(Succeed())
 			})
-			By("asserting the CEL expression in DeviceTaintRule", func() {
-				ca := &scalev1.CardAlert{}
-				Expect(k8sClientWorkload.Get(ctx, testutils.NewNamespacedName(caName, caNamespace), ca)).To(Succeed())
-				dtrName := ca.Status.ResourceRef.Name
-				dtrNamespace := ca.Status.ResourceRef.Namespace
-				celExpr := fmt.Sprintf("cel.bind(%s, device.attributes['%s'], %s.parentUUID=='%s'||%s.parentUUID=='%s')",
-					deviceTaintRuleDevice, deviceTaintRuleCELLabelGPUNvidia,
-					deviceTaintRuleDevice, cards[0].GPUUUID, deviceTaintRuleDevice, cards[1].GPUUUID)
-				dtr := &resourcev1.DeviceTaintRule{}
-				Expect(k8sClientWorkload.Get(ctx, testutils.NewNamespacedName(dtrName, dtrNamespace), dtr)).To(Succeed())
-				Expect(dtr.Spec.DeviceSelector.Selectors[0].CEL.Expression).To(Equal(celExpr))
+			By("asserting the created DeviceTaintRule", func() {
+				dtrList := &resourcev1.DeviceTaintRuleList{}
+				Expect(k8sClientWorkload.List(ctx, dtrList)).To(Succeed())
+				Expect(dtrList.Items).To(HaveLen(5))
+				for idx := range dtrList.Items {
+					dtr := &dtrList.Items[idx]
+					Expect(dtr.Spec.DeviceSelector.Driver).To(HaveValue(Equal(driverName)))
+					Expect(dtr.Spec.DeviceSelector.Pool).To(HaveValue(Equal(poolName)))
+					Expect(dtr.Spec.DeviceSelector.Device).To(SatisfyAny(
+						HaveValue(Equal("device1")), HaveValue(Equal("device2")),
+						HaveValue(Equal("mig-device1")), HaveValue(Equal("mig-device2")), HaveValue(Equal("mig-device3")),
+					))
+				}
 			})
 			// Delete CardAlert
 			Expect(deleteCardAlertResource(ctx, caName, caNamespace)).To(Succeed())
@@ -1667,11 +1734,12 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			Expect(testutils.PatchDCIMachineLogicalServerRef(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, logicalServerName, logicalServerNamespace)).To(Succeed())
 			Expect(testutils.PatchMachineInfrastructureRef(ctx, k8sClientManagement, machineName, machineNamespace, dciMachineName, dciMachineNamespace)).To(Succeed())
 			Expect(testutils.PatchLogicalServerState(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.LogicalServerStateProvisioned)).To(Succeed())
+			Expect(testutils.PatchLogicalServerAppliedServerSpec(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, serverSpec)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			Expect(testutils.CleanupNodeResources(ctx, k8sClientWorkload)).To(Succeed())
-			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload, caNamespace)).To(Succeed())
+			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload)).To(Succeed())
 			Expect(testutils.CleanupMachineResources(ctx, k8sClientManagement, machineNamespace)).To(Succeed())
 			Expect(testutils.CleanupMachineDeploymentResources(ctx, k8sClientManagement, mdNamespace)).To(Succeed())
 			Expect(testutils.CleanupDCIMachineResources(ctx, k8sClientManagement, dciMachineNamespace)).To(Succeed())
@@ -2194,11 +2262,12 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			Expect(testutils.PatchDCIMachineLogicalServerRef(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, logicalServerName, logicalServerNamespace)).To(Succeed())
 			Expect(testutils.PatchMachineInfrastructureRef(ctx, k8sClientManagement, machineName, machineNamespace, dciMachineName, dciMachineNamespace)).To(Succeed())
 			Expect(testutils.PatchLogicalServerState(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.LogicalServerStateProvisioned)).To(Succeed())
+			Expect(testutils.PatchLogicalServerAppliedServerSpec(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, serverSpec)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			Expect(testutils.CleanupNodeResources(ctx, k8sClientWorkload)).To(Succeed())
-			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload, caNamespace)).To(Succeed())
+			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload)).To(Succeed())
 			Expect(testutils.CleanupMachineResources(ctx, k8sClientManagement, machineNamespace)).To(Succeed())
 			Expect(testutils.CleanupMachineDeploymentResources(ctx, k8sClientManagement, mdNamespace)).To(Succeed())
 			Expect(testutils.CleanupDCIMachineResources(ctx, k8sClientManagement, dciMachineNamespace)).To(Succeed())
@@ -2284,10 +2353,25 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 					Num:   int32(1),
 				},
 			)
+			resourceSliceName = "test-resource-slice"
+			driverName        = "nvidia-driver"
+			poolName          = nodeName
+			devices           = map[string]map[string]string{
+				"device1": {
+					"uuid": uuids[0],
+				},
+				"device2": {
+					"uuid": uuids[1],
+				},
+				"device3": {
+					"uuid": uuids[2],
+				},
+			}
 		)
 
 		BeforeEach(func() {
 			Expect(testutils.CreateNodeResource(ctx, k8sClientWorkload, nodeName, clusterName, clusterNamespace, machineName)).To(Succeed())
+			Expect(testutils.CreateResourceSliceResource(ctx, k8sClientWorkload, resourceSliceName, driverName, poolName, devices)).To(Succeed())
 			Expect(testutils.CreateMachineResource(ctx, k8sClientManagement, machineName, machineNamespace, mdName, clusterName)).To(Succeed())
 			Expect(testutils.CreateMachineDeploymentResource(ctx, k8sClientManagement, mdName, mdNamespace, clusterName, capiv1.GroupVersion.Group, templateKind, dciMachineTemplateName, nil)).To(Succeed())
 			Expect(testutils.CreateDCIMachineResource(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, location, "", serverSpec)).To(Succeed())
@@ -2297,11 +2381,13 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			Expect(testutils.PatchDCIMachineLogicalServerRef(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, logicalServerName, logicalServerNamespace)).To(Succeed())
 			Expect(testutils.PatchMachineInfrastructureRef(ctx, k8sClientManagement, machineName, machineNamespace, dciMachineName, dciMachineNamespace)).To(Succeed())
 			Expect(testutils.PatchLogicalServerState(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.LogicalServerStateProvisioned)).To(Succeed())
+			Expect(testutils.PatchLogicalServerAppliedServerSpec(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, serverSpec)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			Expect(testutils.CleanupNodeResources(ctx, k8sClientWorkload)).To(Succeed())
-			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload, caNamespace)).To(Succeed())
+			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload)).To(Succeed())
+			Expect(testutils.CleanupResourceSliceResources(ctx, k8sClientWorkload)).To(Succeed())
 			Expect(testutils.CleanupMachineResources(ctx, k8sClientManagement, machineNamespace)).To(Succeed())
 			Expect(testutils.CleanupMachineDeploymentResources(ctx, k8sClientManagement, mdNamespace)).To(Succeed())
 			Expect(testutils.CleanupDCIMachineResources(ctx, k8sClientManagement, dciMachineNamespace)).To(Succeed())
@@ -3433,11 +3519,66 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 				Expect(executeCaInitializing(r, caName, caNamespace)).To(Succeed())
 				By("setting mock to fail to list DeviceTaintRules", func() {
 					wClient := testutils.NewMockClientHelper(gomock.NewController(GinkgoT()), k8sClientWorkload)
-					Expect(wClient.SetList([]int{1})).To(Succeed()) // failed to list DeviceTaintRules
+					Expect(wClient.SetList([]int{2})).To(Succeed()) // failed to list DeviceTaintRules
 					wClient.SetDefault()
 					r = newCaReconciler(wClient.GetMockClient(), nil)
 				})
 				By("asserting error happens when failed to list DeviceTaintRules", func() {
+					err := executeCaReconciler(r, caName, caNamespace, scalev1.CardAlertCreatingTaintResourceState)
+					Expect(err).To(HaveOccurred())
+					for _, errMsg := range errMsgs {
+						Expect(err.Error()).To(ContainSubstring(errMsg))
+					}
+				})
+				Expect(executeCaCreatingTaintResource(r, caName, caNamespace)).To(Succeed())
+				Expect(executeCaCompleted(r, caName, caNamespace)).To(Succeed())
+			})
+			// Delete CardAlert
+			Expect(deleteCardAlertResource(ctx, caName, caNamespace)).To(Succeed())
+			// Finalize
+			By("executing finalize", func() {
+				Expect(finalizeCaCompleted(r, caName, caNamespace)).To(Succeed())
+				Expect(finalizeCaFinalized(r, caName, caNamespace)).To(Succeed())
+			})
+		})
+
+		It("should successfully reconcile after failure of List() for ResourceSlice", func() {
+			const caName = "test-ca-mock-fail-list-resourceslice"
+			var (
+				cards = []scalev1.CardInfo{
+					{
+						Model:   model,
+						GPUUUID: uuids[0],
+					},
+				}
+				source  = scalev1.WebhookReceiverOnTenant
+				errMsgs = []string{
+					"failed to list ResourceSlices",
+				}
+			)
+			// Setup for this test case
+			By("setting up resources for test case", func() {
+				Expect(testutils.PatchLogicalServerType(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.AppliedServerTypeComposed)).To(Succeed())
+			})
+			r := newCaReconciler(nil, nil)
+			By("setting up auto replacement disabled", func() {
+				r.enableAutoReplace = false
+			})
+			By("creating CardAlert", func() {
+				ca := testutils.NewCardAlert(caName, caNamespace, nodeName, cards, source)
+				Expect(k8sClientWorkload.Create(ctx, ca)).To(Succeed())
+			})
+			// Reconcile
+			By("executing reconcile", func() {
+				Expect(executeCaInitial(r, caName, caNamespace)).To(Succeed())
+				Expect(executeCaInitializing(r, caName, caNamespace)).To(Succeed())
+				By("setting mock to fail to list ResourceSlices", func() {
+					wClient := testutils.NewMockClientHelper(gomock.NewController(GinkgoT()), k8sClientWorkload)
+					Expect(wClient.SetList([]int{1})).To(Succeed()) // failed to list ResourceSlices
+					wClient.SetDefault()
+					r = newCaReconciler(wClient.GetMockClient(), nil)
+				})
+				By("asserting error happens when failed to list ResourceSlices", func() {
 					err := executeCaReconciler(r, caName, caNamespace, scalev1.CardAlertCreatingTaintResourceState)
 					Expect(err).To(HaveOccurred())
 					for _, errMsg := range errMsgs {
@@ -3489,6 +3630,77 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 				By("setting mock to fail to create DeviceTaintRule", func() {
 					wClient := testutils.NewMockClientHelper(gomock.NewController(GinkgoT()), k8sClientWorkload)
 					Expect(wClient.SetCreate([]int{1})).To(Succeed()) // failed to create DeviceTaintRule
+					wClient.SetDefault()
+					r = newCaReconciler(wClient.GetMockClient(), nil)
+				})
+				By("asserting error happens when failed to create DeviceTaintRule", func() {
+					err := executeCaReconciler(r, caName, caNamespace, scalev1.CardAlertCreatingTaintResourceState)
+					Expect(err).To(HaveOccurred())
+					for _, errMsg := range errMsgs {
+						Expect(err.Error()).To(ContainSubstring(errMsg))
+					}
+				})
+				Expect(executeCaCreatingTaintResource(r, caName, caNamespace)).To(Succeed())
+				Expect(executeCaCompleted(r, caName, caNamespace)).To(Succeed())
+			})
+			// Delete CardAlert
+			Expect(deleteCardAlertResource(ctx, caName, caNamespace)).To(Succeed())
+			// Finalize
+			By("executing finalize", func() {
+				Expect(finalizeCaCompleted(r, caName, caNamespace)).To(Succeed())
+				Expect(finalizeCaFinalized(r, caName, caNamespace)).To(Succeed())
+			})
+		})
+
+		It("should successfully reconcile after failure of Create() for DeviceTaintRule in the middle", func() {
+			const caName = "test-ca-mock-fail-create-devicetaintrule-in-middle"
+			var (
+				cards = []scalev1.CardInfo{
+					{
+						Model:   model,
+						GPUUUID: uuids[0],
+					},
+					{
+						Model:   model,
+						GPUUUID: uuids[1],
+					},
+					{
+						Model:   model,
+						GPUUUID: uuids[2],
+					},
+				}
+				source  = scalev1.WebhookReceiverOnTenant
+				errMsgs = []string{
+					"failed to create DeviceTaintRule",
+				}
+				dtrName     = "dummy-taint-rule"
+				taintKey    = deviceTaintRuleKeyUnhealthy
+				taintVal    = deviceTaintRuleValueBroken
+				taintEffect = resourcev1.DeviceTaintEffectNoSchedule // default value is NoExecute
+				driver      = ptr.To("dummy-driver-name")
+				pool        = ptr.To("dummy-pool-name")
+				device      = ptr.To("dummy-device-name")
+			)
+			// Setup for this test case
+			By("setting up resources for test case", func() {
+				Expect(testutils.PatchLogicalServerType(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.AppliedServerTypeComposed)).To(Succeed())
+				Expect(testutils.CreateDeviceTaintRuleResource(ctx, k8sClientWorkload, dtrName, taintKey, taintVal, taintEffect, driver, pool, device)).To(Succeed())
+			})
+			r := newCaReconciler(nil, nil)
+			By("setting up auto replacement disabled", func() {
+				r.enableAutoReplace = false
+			})
+			By("creating CardAlert", func() {
+				ca := testutils.NewCardAlert(caName, caNamespace, nodeName, cards, source)
+				Expect(k8sClientWorkload.Create(ctx, ca)).To(Succeed())
+			})
+			// Reconcile
+			By("executing reconcile", func() {
+				Expect(executeCaInitial(r, caName, caNamespace)).To(Succeed())
+				Expect(executeCaInitializing(r, caName, caNamespace)).To(Succeed())
+				By("setting mock to fail to create DeviceTaintRule", func() {
+					wClient := testutils.NewMockClientHelper(gomock.NewController(GinkgoT()), k8sClientWorkload)
+					Expect(wClient.SetCreate([]int{2})).To(Succeed()) // failed to create DeviceTaintRule
 					wClient.SetDefault()
 					r = newCaReconciler(wClient.GetMockClient(), nil)
 				})
@@ -3672,11 +3884,12 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			Expect(testutils.PatchDCIMachineLogicalServerRef(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, logicalServerName, logicalServerNamespace)).To(Succeed())
 			Expect(testutils.PatchMachineInfrastructureRef(ctx, k8sClientManagement, machineName, machineNamespace, dciMachineName, dciMachineNamespace)).To(Succeed())
 			Expect(testutils.PatchLogicalServerState(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.LogicalServerStateProvisioned)).To(Succeed())
+			Expect(testutils.PatchLogicalServerAppliedServerSpec(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, serverSpec)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			Expect(testutils.CleanupNodeResources(ctx, k8sClientWorkload)).To(Succeed())
-			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload, caNamespace)).To(Succeed())
+			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload)).To(Succeed())
 			Expect(testutils.CleanupMachineResources(ctx, k8sClientManagement, machineNamespace)).To(Succeed())
 			Expect(testutils.CleanupMachineDeploymentResources(ctx, k8sClientManagement, mdNamespace)).To(Succeed())
 			Expect(testutils.CleanupDCIMachineResources(ctx, k8sClientManagement, dciMachineNamespace)).To(Succeed())
@@ -4010,11 +4223,12 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			Expect(testutils.PatchDCIMachineLogicalServerRef(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, logicalServerName, logicalServerNamespace)).To(Succeed())
 			Expect(testutils.PatchMachineInfrastructureRef(ctx, k8sClientManagement, machineName, machineNamespace, dciMachineName, dciMachineNamespace)).To(Succeed())
 			Expect(testutils.PatchLogicalServerState(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.LogicalServerStateProvisioned)).To(Succeed())
+			Expect(testutils.PatchLogicalServerAppliedServerSpec(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, serverSpec)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			Expect(testutils.CleanupNodeResources(ctx, k8sClientWorkload)).To(Succeed())
-			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload, caNamespace)).To(Succeed())
+			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload)).To(Succeed())
 			Expect(testutils.CleanupMachineResources(ctx, k8sClientManagement, machineNamespace)).To(Succeed())
 			Expect(testutils.CleanupMachineDeploymentResources(ctx, k8sClientManagement, mdNamespace)).To(Succeed())
 			Expect(testutils.CleanupDCIMachineResources(ctx, k8sClientManagement, dciMachineNamespace)).To(Succeed())
@@ -4360,11 +4574,12 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			Expect(testutils.PatchDCIMachineLogicalServerRef(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, logicalServerName, logicalServerNamespace)).To(Succeed())
 			Expect(testutils.PatchMachineInfrastructureRef(ctx, k8sClientManagement, machineName, machineNamespace, dciMachineName, dciMachineNamespace)).To(Succeed())
 			Expect(testutils.PatchLogicalServerState(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.LogicalServerStateProvisioned)).To(Succeed())
+			Expect(testutils.PatchLogicalServerAppliedServerSpec(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, serverSpec)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			Expect(testutils.CleanupNodeResources(ctx, k8sClientWorkload)).To(Succeed())
-			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload, caNamespace)).To(Succeed())
+			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload)).To(Succeed())
 			Expect(testutils.CleanupMachineResources(ctx, k8sClientManagement, machineNamespace)).To(Succeed())
 			Expect(testutils.CleanupMachineDeploymentResources(ctx, k8sClientManagement, mdNamespace)).To(Succeed())
 			Expect(testutils.CleanupDCIMachineResources(ctx, k8sClientManagement, dciMachineNamespace)).To(Succeed())
@@ -4534,10 +4749,46 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 					Num:   int32(1),
 				},
 			)
+			resourceSliceName = "test-resource-slice"
+			driverName        = "nvidia-driver"
+			poolName          = nodeName
+			devices           = map[string]map[string]string{
+				"device1": {
+					"uuid": uuids[0],
+				},
+				"device2": {
+					"uuid": uuids[1],
+				},
+				"device3": {
+					"uuid": uuids[2],
+				},
+			}
+			migUUIDs = []string{
+				"mig-uuid-1",
+				"mig-uuid-2",
+				"mig-uuid-3",
+			}
+			migResourceSliceName = "test-mig-resource-slice"
+			migDevices           = map[string]map[string]string{
+				"mig-device1": {
+					"parentUUID": uuids[0],
+					"uuid":       migUUIDs[0],
+				},
+				"mig-device2": {
+					"parentUUID": uuids[0],
+					"uuid":       migUUIDs[1],
+				},
+				"mig-device3": {
+					"parentUUID": uuids[1],
+					"uuid":       migUUIDs[2],
+				},
+			}
 		)
 
 		BeforeEach(func() {
 			Expect(testutils.CreateNodeResource(ctx, k8sClientWorkload, nodeName, clusterName, clusterNamespace, machineName)).To(Succeed())
+			Expect(testutils.CreateResourceSliceResource(ctx, k8sClientWorkload, resourceSliceName, driverName, poolName, devices)).To(Succeed())
+			Expect(testutils.CreateResourceSliceResource(ctx, k8sClientWorkload, migResourceSliceName, driverName, poolName, migDevices)).To(Succeed())
 			Expect(testutils.CreateMachineResource(ctx, k8sClientManagement, machineName, machineNamespace, mdName, clusterName)).To(Succeed())
 			Expect(testutils.CreateMachineDeploymentResource(ctx, k8sClientManagement, mdName, mdNamespace, clusterName, capiv1.GroupVersion.Group, templateKind, dciMachineTemplateName, nil)).To(Succeed())
 			Expect(testutils.CreateDCIMachineResource(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, location, "", serverSpec)).To(Succeed())
@@ -4547,11 +4798,13 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 			Expect(testutils.PatchDCIMachineLogicalServerRef(ctx, k8sClientManagement, dciMachineName, dciMachineNamespace, logicalServerName, logicalServerNamespace)).To(Succeed())
 			Expect(testutils.PatchMachineInfrastructureRef(ctx, k8sClientManagement, machineName, machineNamespace, dciMachineName, dciMachineNamespace)).To(Succeed())
 			Expect(testutils.PatchLogicalServerState(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, rpmv1.LogicalServerStateProvisioned)).To(Succeed())
+			Expect(testutils.PatchLogicalServerAppliedServerSpec(ctx, k8sClientManagement, logicalServerName, logicalServerNamespace, serverSpec)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			Expect(testutils.CleanupNodeResources(ctx, k8sClientWorkload)).To(Succeed())
-			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload, caNamespace)).To(Succeed())
+			Expect(testutils.CleanupResourceSliceResources(ctx, k8sClientWorkload)).To(Succeed())
+			Expect(testutils.CleanupDeviceTaintRuleResources(ctx, k8sClientWorkload)).To(Succeed())
 			Expect(testutils.CleanupMachineResources(ctx, k8sClientManagement, machineNamespace)).To(Succeed())
 			Expect(testutils.CleanupMachineDeploymentResources(ctx, k8sClientManagement, mdNamespace)).To(Succeed())
 			Expect(testutils.CleanupDCIMachineResources(ctx, k8sClientManagement, dciMachineNamespace)).To(Succeed())
@@ -4897,7 +5150,7 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 					},
 					{
 						Model:   model,
-						GPUUUID: uuids[1],
+						GPUUUID: uuids[2],
 					},
 				}
 				source = scalev1.WebhookReceiverOnTenant
@@ -4922,17 +5175,19 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 				Expect(executeCaCreatingTaintResource(r, caName, caNamespace)).To(Succeed())
 				Expect(executeCaCompleted(r, caName, caNamespace)).To(Succeed())
 			})
-			By("asserting the CEL expression in DeviceTaintRule", func() {
-				ca := &scalev1.CardAlert{}
-				Expect(k8sClientWorkload.Get(ctx, testutils.NewNamespacedName(caName, caNamespace), ca)).To(Succeed())
-				dtrName := ca.Status.ResourceRef.Name
-				dtrNamespace := ca.Status.ResourceRef.Namespace
-				celExpr := fmt.Sprintf("cel.bind(%s, device.attributes['%s'], %s.uuid=='%s'||%s.uuid=='%s')",
-					deviceTaintRuleDevice, deviceTaintRuleCELLabelGPUNvidia,
-					deviceTaintRuleDevice, cards[0].GPUUUID, deviceTaintRuleDevice, cards[1].GPUUUID)
-				dtr := &resourcev1.DeviceTaintRule{}
-				Expect(k8sClientWorkload.Get(ctx, testutils.NewNamespacedName(dtrName, dtrNamespace), dtr)).To(Succeed())
-				Expect(dtr.Spec.DeviceSelector.Selectors[0].CEL.Expression).To(Equal(celExpr))
+			By("asserting the created DeviceTaintRule", func() {
+				dtrList := &resourcev1.DeviceTaintRuleList{}
+				Expect(k8sClientWorkload.List(ctx, dtrList)).To(Succeed())
+				Expect(dtrList.Items).To(HaveLen(4))
+				for idx := range dtrList.Items {
+					dtr := &dtrList.Items[idx]
+					Expect(dtr.Spec.DeviceSelector.Driver).To(HaveValue(Equal(driverName)))
+					Expect(dtr.Spec.DeviceSelector.Pool).To(HaveValue(Equal(poolName)))
+					Expect(dtr.Spec.DeviceSelector.Device).To(SatisfyAny(
+						HaveValue(Equal("device1")), HaveValue(Equal("device3")),
+						HaveValue(Equal("mig-device1")), HaveValue(Equal("mig-device2")),
+					))
+				}
 			})
 			// Delete CardAlert
 			Expect(deleteCardAlertResource(ctx, caName, caNamespace)).To(Succeed())
@@ -4951,15 +5206,15 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 						Model:   model,
 						GPUUUID: uuids[0],
 						MIGUUIDs: []string{
-							"mig-uuid-1",
-							"mig-uuid-2",
+							migUUIDs[0],
+							migUUIDs[1],
 						},
 					},
 					{
 						Model:   model,
 						GPUUUID: uuids[1],
 						MIGUUIDs: []string{
-							"mig-uuid-3",
+							migUUIDs[2],
 						},
 					},
 				}
@@ -4985,17 +5240,19 @@ var _ = Describe("CardAlert Controller", Label("ca", "controller"), func() {
 				Expect(executeCaCreatingTaintResource(r, caName, caNamespace)).To(Succeed())
 				Expect(executeCaCompleted(r, caName, caNamespace)).To(Succeed())
 			})
-			By("asserting the CEL expression in DeviceTaintRule", func() {
-				ca := &scalev1.CardAlert{}
-				Expect(k8sClientWorkload.Get(ctx, testutils.NewNamespacedName(caName, caNamespace), ca)).To(Succeed())
-				dtrName := ca.Status.ResourceRef.Name
-				dtrNamespace := ca.Status.ResourceRef.Namespace
-				celExpr := fmt.Sprintf("cel.bind(%s, device.attributes['%s'], %s.parentUUID=='%s'||%s.parentUUID=='%s')",
-					deviceTaintRuleDevice, deviceTaintRuleCELLabelGPUNvidia,
-					deviceTaintRuleDevice, cards[0].GPUUUID, deviceTaintRuleDevice, cards[1].GPUUUID)
-				dtr := &resourcev1.DeviceTaintRule{}
-				Expect(k8sClientWorkload.Get(ctx, testutils.NewNamespacedName(dtrName, dtrNamespace), dtr)).To(Succeed())
-				Expect(dtr.Spec.DeviceSelector.Selectors[0].CEL.Expression).To(Equal(celExpr))
+			By("asserting the created DeviceTaintRule", func() {
+				dtrList := &resourcev1.DeviceTaintRuleList{}
+				Expect(k8sClientWorkload.List(ctx, dtrList)).To(Succeed())
+				Expect(dtrList.Items).To(HaveLen(5))
+				for idx := range dtrList.Items {
+					dtr := &dtrList.Items[idx]
+					Expect(dtr.Spec.DeviceSelector.Driver).To(HaveValue(Equal(driverName)))
+					Expect(dtr.Spec.DeviceSelector.Pool).To(HaveValue(Equal(poolName)))
+					Expect(dtr.Spec.DeviceSelector.Device).To(SatisfyAny(
+						HaveValue(Equal("device1")), HaveValue(Equal("device2")),
+						HaveValue(Equal("mig-device1")), HaveValue(Equal("mig-device2")), HaveValue(Equal("mig-device3")),
+					))
+				}
 			})
 			// Delete CardAlert
 			Expect(deleteCardAlertResource(ctx, caName, caNamespace)).To(Succeed())
@@ -5297,7 +5554,7 @@ func newCaReconciler(
 ) *CardAlertReconciler {
 	By("creating CardAlertReconciler")
 	controllerReconciler := (&CardAlertReconciler{
-		Recorder:                      record.NewFakeRecorder(1024),
+		Recorder:                      events.NewFakeRecorder(1024),
 		enableTTLSecondsAfterFinished: false,
 		ttlSecondsAfterFinished:       3600,
 		MachineAlertNamespace:         rpmNamespace,

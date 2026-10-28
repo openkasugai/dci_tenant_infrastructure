@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package client
 
 import (
@@ -31,6 +17,8 @@ import (
 const dockerMachineTemplateKind = "DockerMachineTemplate"
 
 // GetDockerMachineTemplate gets DockerMachineTemplate resource from management cluster.
+//
+//nolint:staticcheck // capdockerv1.DockerMachineTemplate is deprecated but still used because this is only for test purpose
 func (h *clientHelperStruct) GetDockerMachineTemplate(
 	ctx context.Context, name, namespace string,
 ) (*capdockerv1.DockerMachineTemplate, error) {
@@ -107,6 +95,8 @@ func (h *clientHelperStruct) CreateDockerMachineTemplateFromNodeScalingRequest(
 }
 
 // DeleteDockerMachineTemplate deletes DockerMachineTemplate resource from management cluster.
+//
+//nolint:staticcheck // capdockerv1.DockerMachineTemplate is deprecated but still used because this is only for test purpose
 func (h *clientHelperStruct) DeleteDockerMachineTemplate(
 	ctx context.Context, dockerMachineTemplate *capdockerv1.DockerMachineTemplate,
 ) error {
@@ -149,6 +139,8 @@ func (h *clientHelperStruct) DeleteDockerMachineTemplateUnused(
 }
 
 // IsReferredDockerMachineTemplate checks whether the DockerMachineTemplate is free or not.
+//
+//nolint:staticcheck // capdockerv1.DockerMachineTemplate is deprecated but still used because this is only for test purpose
 func (h *clientHelperStruct) IsReferredDockerMachineTemplate(
 	ctx context.Context, template *capdockerv1.DockerMachineTemplate, md *capiv1.MachineDeployment, namespace string,
 ) (bool, error) {

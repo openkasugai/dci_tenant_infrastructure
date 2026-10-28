@@ -131,6 +131,7 @@ check_config_json() {
     kind_image_version=$(get_config_parameter '.kind_image_version' "${kind_image_version}" ${config_json_path})
     calico_version=$(get_config_parameter '.calico_version' "${calico_version}" ${config_json_path})
     cert_manager_version=$(get_config_parameter '.cert_manager_version' "${cert_manager_version}" ${config_json_path})
+    cluster_api_version=$(get_config_parameter '.cluster_api_version' "${cluster_api_version}" ${config_json_path})
 
     echo "Reading ${config_json_path} finished successfully."
 

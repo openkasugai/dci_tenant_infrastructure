@@ -6,7 +6,9 @@ domain: my.domain
 layout:
 - go.kubebuilder.io/v4
 plugins:
-  helm.kubebuilder.io/v1-alpha: {}
+  helm.kubebuilder.io/v2-alpha:
+    manifests: dist/install-scale-controller.yaml
+    output: dist
 projectName: scale-controller
 repo: scale-controller
 resources:

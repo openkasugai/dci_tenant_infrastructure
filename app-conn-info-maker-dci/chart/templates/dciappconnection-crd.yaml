@@ -3,7 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   name: dciappconnections.example.com
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.21.0
   labels:
   {{- include "chart.labels" . | nindent 4 }}
 spec:
@@ -45,7 +45,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: DCIAppConnectionSpec defines the desired state of DCIAppConnection.
+            description: spec defines the desired state of DCIAppConnection
             properties:
               connections:
                 description: |-
@@ -105,92 +105,233 @@ spec:
                   - to
                   type: object
                 type: array
-              inputEndpoint:
-                description: |-
-                  DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
-                  It is currently identical to ExternalEndpoint, keep as an alias to avoid duplicate
-                  struct definitions and to remain compatible with tests that construct
-                  examplecomv1.ExternalEndpoint values.
-                  DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
-                properties:
-                  externalSubsets:
-                    items:
-                      type: string
-                    minItems: 1
-                    type: array
-                  internal:
-                    description: Connection defines the desired state of Connection
-                      and ExternalEndpoint.
-                    properties:
-                      deploymentRef:
-                        properties:
-                          name:
-                            maxLength: 63
-                            minLength: 1
-                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                            type: string
-                          namespace:
-                            maxLength: 63
-                            minLength: 1
-                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                            type: string
-                        required:
-                        - name
-                        - namespace
-                        type: object
-                    required:
-                    - deploymentRef
-                    type: object
-                required:
-                - externalSubsets
-                - internal
-                type: object
-              outputEndpoint:
-                description: |-
-                  DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
-                  It is currently identical to ExternalEndpoint, keep as an alias to avoid duplicate
-                  struct definitions and to remain compatible with tests that construct
-                  examplecomv1.ExternalEndpoint values.
-                  DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
-                properties:
-                  externalSubsets:
-                    items:
-                      type: string
-                    minItems: 1
-                    type: array
-                  internal:
-                    description: Connection defines the desired state of Connection
-                      and ExternalEndpoint.
-                    properties:
-                      deploymentRef:
-                        properties:
-                          name:
-                            maxLength: 63
-                            minLength: 1
-                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                            type: string
-                          namespace:
-                            maxLength: 63
-                            minLength: 1
-                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                            type: string
-                        required:
-                        - name
-                        - namespace
-                        type: object
-                    required:
-                    - deploymentRef
-                    type: object
-                required:
-                - externalSubsets
-                - internal
-                type: object
-            required:
-            - connections
+              inputEndpoints:
+                items:
+                  description: |-
+                    DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                    It is currently identical to ExternalEndpoint, keep as an alias to avoid duplicate
+                    struct definitions and to remain compatible with tests that construct
+                    examplecomv1.ExternalEndpoint values.
+                    DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                  properties:
+                    externalSubsets:
+                      items:
+                        type: string
+                      minItems: 1
+                      type: array
+                    internal:
+                      description: Connection defines the desired state of Connection
+                        and ExternalEndpoint.
+                      properties:
+                        deploymentRef:
+                          properties:
+                            name:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - deploymentRef
+                      type: object
+                  required:
+                  - externalSubsets
+                  - internal
+                  type: object
+                type: array
+              outputEndpoints:
+                items:
+                  description: |-
+                    DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                    It is currently identical to ExternalEndpoint, keep as an alias to avoid duplicate
+                    struct definitions and to remain compatible with tests that construct
+                    examplecomv1.ExternalEndpoint values.
+                    DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                  properties:
+                    externalSubsets:
+                      items:
+                        type: string
+                      minItems: 1
+                      type: array
+                    internal:
+                      description: Connection defines the desired state of Connection
+                        and ExternalEndpoint.
+                      properties:
+                        deploymentRef:
+                          properties:
+                            name:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - deploymentRef
+                      type: object
+                  required:
+                  - externalSubsets
+                  - internal
+                  type: object
+                type: array
             type: object
           status:
-            description: DCIAppConnectionStatus defines the observed state of DCIAppConnection.
+            description: status defines the observed state of DCIAppConnection
             properties:
+              connections:
+                items:
+                  description: Connection defines the desired state of DCIAppConnectionSpec.
+                  properties:
+                    from:
+                      description: Connection defines the desired state of Connection
+                        and ExternalEndpoint.
+                      properties:
+                        deploymentRef:
+                          properties:
+                            name:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - deploymentRef
+                      type: object
+                    to:
+                      description: Connection defines the desired state of Connection
+                        and ExternalEndpoint.
+                      properties:
+                        deploymentRef:
+                          properties:
+                            name:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - deploymentRef
+                      type: object
+                  required:
+                  - from
+                  - to
+                  type: object
+                type: array
+              inputEndpoints:
+                items:
+                  description: |-
+                    DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                    It is currently identical to ExternalEndpoint, keep as an alias to avoid duplicate
+                    struct definitions and to remain compatible with tests that construct
+                    examplecomv1.ExternalEndpoint values.
+                    DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                  properties:
+                    externalSubsets:
+                      items:
+                        type: string
+                      minItems: 1
+                      type: array
+                    internal:
+                      description: Connection defines the desired state of Connection
+                        and ExternalEndpoint.
+                      properties:
+                        deploymentRef:
+                          properties:
+                            name:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - deploymentRef
+                      type: object
+                  required:
+                  - externalSubsets
+                  - internal
+                  type: object
+                type: array
+              outputEndpoints:
+                items:
+                  description: |-
+                    DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                    It is currently identical to ExternalEndpoint, keep as an alias to avoid duplicate
+                    struct definitions and to remain compatible with tests that construct
+                    examplecomv1.ExternalEndpoint values.
+                    DCIAppConnectionExternalEndpoint defines the desired state of DCIAppConnectionSpec.
+                  properties:
+                    externalSubsets:
+                      items:
+                        type: string
+                      minItems: 1
+                      type: array
+                    internal:
+                      description: Connection defines the desired state of Connection
+                        and ExternalEndpoint.
+                      properties:
+                        deploymentRef:
+                          properties:
+                            name:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                            namespace:
+                              maxLength: 63
+                              minLength: 1
+                              pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - deploymentRef
+                      type: object
+                  required:
+                  - externalSubsets
+                  - internal
+                  type: object
+                type: array
               phase:
                 default: ""
                 description: |-
@@ -205,6 +346,8 @@ spec:
             required:
             - phase
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

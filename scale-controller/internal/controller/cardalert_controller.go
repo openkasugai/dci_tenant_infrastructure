@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -23,12 +9,17 @@ import (
 	"strings"
 	"time"
 
+	// TODO: Switch to "k8s.io/api/resource/v1" once DeviceTaintRule is supported in v1.
+	// DeviceTaintRule is currently available only in v1beta2, so we use v1beta2 for now.
+	// However, ResourceSlice in v1beta2 is deprecated in v1.36+ and will be removed in v1.39+,
+	// so we should migrate to v1 as soon as DeviceTaintRule is available there.
+	resourcev1 "k8s.io/api/resource/v1beta2"
+
 	corev1 "k8s.io/api/core/v1"
-	resourcev1 "k8s.io/api/resource/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,7 +43,7 @@ type CardAlertReconciler struct {
 	Scheme *runtime.Scheme
 
 	// interface for event recorder
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 
 	// client for management cluster
 	ClientHelper helperclient.ClientHelper
@@ -80,7 +71,7 @@ type CardAlertReconciler struct {
 // Additional rbac
 // +kubebuilder:rbac:groups=cluster.my.domain,resources=cardscalingrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;update;patch
 // +kubebuilder:rbac:groups=resource.k8s.io,resources=devicetaintrules,verbs=get;list;watch;create
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -261,7 +252,7 @@ func (r *CardAlertReconciler) doReconcile(
 
 	if err != nil {
 		err = fmt.Errorf("failed to execute Reconcile process for state '%s': %w", lastCA.Status.State, err)
-		r.Recorder.Event(ca, corev1.EventTypeWarning, eventReason, err.Error())
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeWarning, eventReason, eventActionReconciling, err.Error())
 	}
 
 	return rslt, err
@@ -319,7 +310,7 @@ func (r *CardAlertReconciler) reconcileInitial(
 	if len(processingCAs) > 0 {
 		// Other processing CardAlerts exist, update state to Pending.
 		ca.Status.State = scalev1.CardAlertPendingState
-		r.Recorder.Event(ca, corev1.EventTypeNormal, eventReasonPending,
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonPending, eventActionReconciling,
 			"Pending this CardAlert until another one is completed")
 		return ctrl.Result{RequeueAfter: requeueIntervalCardAlertPending}, nil
 	}
@@ -372,7 +363,7 @@ func (r *CardAlertReconciler) reconcileInitializing(
 		ca.Status.State = scalev1.CardAlertCompletedState
 		logger := log.FromContext(ctx)
 		logger.Info("CardAlert is completed because there is already no target Node", "NodeName", ca.Spec.NodeName)
-		r.Recorder.Eventf(ca, corev1.EventTypeNormal, eventReasonCompleted,
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonCompleted, eventActionReconciling,
 			"CardAlert is completed because there is already no target Node(%s)", ca.Spec.NodeName)
 		return ctrl.Result{}, nil
 	} else if err != nil {
@@ -455,7 +446,7 @@ func (r *CardAlertReconciler) reconcileCreatingReplaceResource(
 		ca.Status.CompletedTime = metav1.NewTime(time.Now())
 		ca.Status.State = scalev1.CardAlertCompletedState
 		logger.Info("CardAlert is completed because there is no target card in LogicalServer")
-		r.Recorder.Event(ca, corev1.EventTypeNormal, eventReasonCompleted,
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonCompleted, eventActionReconciling,
 			"CardAlert is completed because there is no target card in LogicalServer")
 		return ctrl.Result{}, nil
 	}
@@ -471,7 +462,7 @@ func (r *CardAlertReconciler) reconcileCreatingReplaceResource(
 		}
 		// Update state to WaitingCardScalingRequest.
 		ca.Status.State = scalev1.CardAlertWaitingCardScalingRequestState
-		r.Recorder.Eventf(ca, corev1.EventTypeNormal, eventReasonCardScalingRequestCreated,
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonCardScalingRequestCreated, eventActionReconciling,
 			"Created CardScalingRequest(%s/%s) for auto replacement", ca.Status.ResourceRef.Namespace, ca.Status.ResourceRef.Name)
 		return ctrl.Result{}, nil
 
@@ -483,7 +474,7 @@ func (r *CardAlertReconciler) reconcileCreatingReplaceResource(
 		}
 		// Update state to WaitingMachineAlert.
 		ca.Status.State = scalev1.CardAlertWaitingMachineAlertState
-		r.Recorder.Eventf(ca, corev1.EventTypeNormal, eventReasonMachineAlertCreated,
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonMachineAlertCreated, eventActionReconciling,
 			"Created MachineAlert(%s/%s) for auto replacement", ca.Status.ResourceRef.Namespace, ca.Status.ResourceRef.Name)
 		return ctrl.Result{}, nil
 
@@ -491,7 +482,7 @@ func (r *CardAlertReconciler) reconcileCreatingReplaceResource(
 		// Update state to Failed.
 		err := errors.New("node created by VM is not supported for auto replacement")
 		ca.Status.State = scalev1.CardAlertFailedState
-		r.Recorder.Event(ca, corev1.EventTypeWarning, eventReasonVMTypeNotSupported,
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeWarning, eventReasonVMTypeNotSupported, eventActionReconciling,
 			"CardAlert is failed because VM type LogicalServer is not supported for auto replacement")
 		return ctrl.Result{}, err
 
@@ -504,8 +495,10 @@ func classifyCards(
 	cards []scalev1.CardInfo, ls *rpmv1.LogicalServer,
 ) (targets, skips []scalev1.CardInfo) {
 	for _, gpu := range cards {
-		if slices.ContainsFunc(ls.Spec.ServerSpec.GPU.Assignments, func(assign rpmv1.GPUAssignment) bool {
-			return assign.UUID == gpu.GPUUUID
+		if slices.ContainsFunc(ls.Status.AppliedSpec.ServerSpec.GPUs, func(applied rpmv1.AppliedGPUSpec) bool {
+			return applied.Required && slices.ContainsFunc(applied.Assignments, func(assignment rpmv1.GPUAssignment) bool {
+				return assignment.UUID == gpu.GPUUUID
+			})
 		}) {
 			// attempt to create CardScalingRequest by these UUIDs
 			targets = append(targets, gpu)
@@ -680,7 +673,7 @@ func (r *CardAlertReconciler) reconcileWaitingCardScalingRequest(
 		ca.Status.CompletedTime = metav1.NewTime(time.Now())
 		ca.Status.State = scalev1.CardAlertCompletedState
 		logger.Info("CardAlert is completed with successful auto replacement by CardScalingRequest")
-		r.Recorder.Event(ca, corev1.EventTypeNormal, eventReasonCompleted,
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonCompleted, eventActionReconciling,
 			"CardAlert is completed with successful auto replacement by CardScalingRequest")
 		return ctrl.Result{}, nil
 
@@ -688,7 +681,7 @@ func (r *CardAlertReconciler) reconcileWaitingCardScalingRequest(
 		// Update state to Failed.
 		err := fmt.Errorf("failed CardAlert because auto replacement by CardScalingRequest failed with phase: %s", csr.Status.Phase)
 		ca.Status.State = scalev1.CardAlertFailedState
-		r.Recorder.Event(ca, corev1.EventTypeWarning, eventReasonCardScalingRequestFailed, err.Error())
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeWarning, eventReasonCardScalingRequestFailed, eventActionReconciling, err.Error())
 		return ctrl.Result{}, err
 
 	default:
@@ -754,7 +747,7 @@ func (r *CardAlertReconciler) reconcileDeletingMachineAlert(
 	ca.Status.CompletedTime = metav1.NewTime(time.Now())
 	ca.Status.State = scalev1.CardAlertCompletedState
 	logger.Info("CardAlert is completed with successful creation and deletion of MachineAlert for auto replacement")
-	r.Recorder.Event(ca, corev1.EventTypeNormal, eventReasonCompleted,
+	r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonCompleted, eventActionReconciling,
 		"CardAlert is completed with successful creation and deletion of MachineAlert for auto replacement")
 
 	return ctrl.Result{}, nil
@@ -793,14 +786,14 @@ func (r *CardAlertReconciler) reconcileCreatingTaintResource(
 		ca.Status.CompletedTime = metav1.NewTime(time.Now())
 		ca.Status.State = scalev1.CardAlertCompletedState
 		logger.Info("CardAlert is completed because there is no target card in LogicalServer")
-		r.Recorder.Event(ca, corev1.EventTypeNormal, eventReasonCompleted,
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonCompleted, eventActionReconciling,
 			"CardAlert is completed because there is no target card in LogicalServer")
 		return ctrl.Result{}, nil
 	}
 	ca.Status.CardModel = targets[0].Model // assume all target cards have the same model
 
 	// Create DeviceTaintRule to taint the target Node(LogicalServer) when auto replacement is disabled.
-	if err := r.createDeviceTaintRule(ctx, ca); err != nil {
+	if err := r.createDeviceTaintRules(ctx, ca); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to create DeviceTaintRule: %w", err)
 	}
 
@@ -808,110 +801,134 @@ func (r *CardAlertReconciler) reconcileCreatingTaintResource(
 	ca.Status.CompletedTime = metav1.NewTime(time.Now())
 	ca.Status.State = scalev1.CardAlertCompletedState
 	logger.Info("CardAlert is completed with successful creation of DeviceTaintRule")
-	r.Recorder.Event(ca, corev1.EventTypeNormal, eventReasonCompleted,
+	r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonCompleted, eventActionReconciling,
 		"CardAlert is completed with successful creation of DeviceTaintRule")
 
 	return ctrl.Result{}, nil
 }
 
-// createDeviceTaintRule is a function to create DeviceTaintRule to taint the target Cards.
-func (r *CardAlertReconciler) createDeviceTaintRule(
+// createDeviceTaintRules is a function to create DeviceTaintRule to taint the target Cards.
+func (r *CardAlertReconciler) createDeviceTaintRules(
 	ctx context.Context, ca *scalev1.CardAlert,
 ) error {
+	logger := log.FromContext(ctx)
 	// List existing DeviceTaintRules.
-	ruleList, err := r.ClientHelper.ListDeviceTaintRule(ctx, ca.Namespace)
+	selectors, err := r.buildDeviceTaintSelectors(ctx, ca.Status.TargetCards)
+	if err != nil {
+		return fmt.Errorf("failed to build DeviceTaintSelectors: %w", err)
+	} else if len(selectors) == 0 {
+		logger.Info("No DeviceTaintSelector is built for the target cards, so no DeviceTaintRule will be created",
+			"targetCards", ca.Status.TargetCards)
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonNoSelectorsBuilt, eventActionReconciling,
+			"No DeviceTaintSelector is built for the target cards, so no DeviceTaintRule will be created for cards: %v",
+			ca.Status.TargetCards)
+		return nil
+	}
+
+	// List existing DeviceTaintRules.
+	ruleList, err := r.ClientHelper.ListDeviceTaintRule(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list DeviceTaintRules: %w", err)
 	}
 
-	// Check if there is already a DeviceTaintRule for the CardAlert.
-	var ruleExisting *resourcev1.DeviceTaintRule
-	for idx := range ruleList.Items {
-		rule := &ruleList.Items[idx]
-		if utils.IsSameCardAlertCreatedByAnnotations(rule.Annotations, ca.Name, ca.Namespace) {
+	// Create DeviceTaintRule for each DeviceTaintSelector.
+	taint := resourcev1.DeviceTaint{
+		Key:    deviceTaintRuleKeyUnhealthy,
+		Value:  deviceTaintRuleValueBroken,
+		Effect: r.cardTaintPolicy,
+	}
+	for idx := range selectors {
+		selector := &selectors[idx]
+		var ruleExisting *resourcev1.DeviceTaintRule
+		// Check if there is already a DeviceTaintRules for the CardAlert.
+		for idx := range ruleList.Items {
+			rule := &ruleList.Items[idx]
+			if t := rule.Spec.Taint; t.Key != taint.Key || t.Value != taint.Value || t.Effect != taint.Effect {
+				continue // skip if the taint is different
+			}
+			if !utils.IsSameDeviceTaintSelector(rule.Spec.DeviceSelector, selector) {
+				continue // skip if the selector is different
+			}
 			ruleExisting = rule
 			break
 		}
-	}
-
-	if ruleExisting == nil {
-		// Create DeviceTaintRule.
-		rule := &resourcev1.DeviceTaintRule{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: fmt.Sprintf("%s-", ca.Name),
-				Annotations: map[string]string{
-					scalev1.CreatedByNameLabel:      ca.Name,
-					scalev1.CreatedByNamespaceLabel: ca.Namespace,
-				},
-			},
-			Spec: resourcev1.DeviceTaintRuleSpec{
-				DeviceSelector: &resourcev1.DeviceTaintSelector{
-					Selectors: []resourcev1.DeviceSelector{
-						{
-							CEL: &resourcev1.CELDeviceSelector{
-								Expression: createCELExpression(ca.Status.TargetCards),
-							},
-						},
+		if ruleExisting == nil {
+			// Create DeviceTaintRule.
+			rule := &resourcev1.DeviceTaintRule{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: fmt.Sprintf("%s-", ca.Name),
+					Annotations: map[string]string{
+						scalev1.CreatedByNameLabel:      ca.Name,
+						scalev1.CreatedByNamespaceLabel: ca.Namespace,
 					},
 				},
-				Taint: resourcev1.DeviceTaint{
-					Key:    deviceTaintRuleKeyUnhealthy,
-					Value:  deviceTaintRuleValueBroken,
-					Effect: r.cardTaintPolicy,
+				Spec: resourcev1.DeviceTaintRuleSpec{
+					DeviceSelector: selector,
+					Taint:          taint,
 				},
-			},
+			}
+			if err := r.ClientHelper.CreateDeviceTaintRule(ctx, rule); err != nil {
+				return fmt.Errorf("failed to create DeviceTaintRule: %w", err)
+			}
+			logger.Info("DeviceTaintRule created for the target card",
+				"ruleName", rule.Name, "deviceSelector", selector)
+		} else {
+			// Skip creating DeviceTaintRule if it already exists for the target card.
+			logger.Info("DeviceTaintRule already exists for the target card, so skip creating a new one",
+				"ruleName", ruleExisting.Name, "deviceSelector", selector)
 		}
-		if err := r.ClientHelper.CreateDeviceTaintRule(ctx, rule); err != nil {
-			return fmt.Errorf("failed to create DeviceTaintRule: %w", err)
-		}
+	}
 
-		// Set reference of the created DeviceTaintRule to status of CardAlert.
-		ca.Status.ResourceRef = corev1.ObjectReference{
-			APIVersion: resourcev1.SchemeGroupVersion.String(),
-			Kind:       "DeviceTaintRule",
-			Name:       rule.Name,
-			Namespace:  rule.Namespace,
-			UID:        rule.UID,
-		}
-	} else {
-		// Set reference of the existing DeviceTaintRule to status of CardAlert.
-		ca.Status.ResourceRef = corev1.ObjectReference{
-			APIVersion: resourcev1.SchemeGroupVersion.String(),
-			Kind:       "DeviceTaintRule",
-			Name:       ruleExisting.Name,
-			Namespace:  ruleExisting.Namespace,
-			UID:        ruleExisting.UID,
-		}
+	// Set reference of the created/existing DeviceTaintRule to status of CardAlert.
+	ca.Status.ResourceRef = corev1.ObjectReference{
+		APIVersion: resourcev1.SchemeGroupVersion.String(),
+		Kind:       "DeviceTaintRule",
 	}
 
 	return nil
 }
 
-// createCELExpression is a function to create CEL expression for DeviceSelector in DeviceTaintRule
+// buildDeviceTaintSelectors is a function to build DeviceTaintSelector slices
 // based on the target cards in CardAlert status.
-//
-// See https://github.com/kubernetes/api/blob/v0.34.2/resource/v1alpha3/types.go#L33.
-func createCELExpression(
-	cards []scalev1.CardInfo,
-) string {
-	var cel string
+func (r *CardAlertReconciler) buildDeviceTaintSelectors(
+	ctx context.Context, cards []scalev1.CardInfo,
+) ([]resourcev1.DeviceTaintSelector, error) {
+	// List resourceslice
+	rsList, err := r.ClientHelper.ListResourceSlice(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ResourceSlices: %w", err)
+	}
 
-	for i, card := range cards {
-		if len(card.MIGUUIDs) > 0 {
-			cel += fmt.Sprintf("%s.%s=='%s'", deviceTaintRuleDevice, deviceTaintRuleCELPathParentUUID, card.GPUUUID)
-		} else {
-			cel += fmt.Sprintf("%s.%s=='%s'", deviceTaintRuleDevice, deviceTaintRuleCELPathUUID, card.GPUUUID)
-		}
-		if i != len(cards)-1 {
-			cel += "||"
+	// build DeviceTaintSelector for each ResourceSlice based on the target cards in CardAlert status.
+	var selectors []resourcev1.DeviceTaintSelector
+	for idx := range rsList.Items {
+		rs := &rsList.Items[idx]
+		for _, card := range cards {
+			for i := range rs.Spec.Devices {
+				device := &rs.Spec.Devices[i]
+				// Get the GPU UUID of the target card from parentUUID or uuid attribute.
+				attr, exist := device.Attributes["parentUUID"]
+				if !exist {
+					attr, exist = device.Attributes["uuid"]
+					if !exist {
+						continue // skip if the device does not have parentUUID or uuid attribute
+					}
+				}
+				// Check if the device matches the target card.
+				if val := attr.StringValue; val != nil && *val == card.GPUUUID {
+					// Device matches the target card.
+					selector := resourcev1.DeviceTaintSelector{
+						Driver: &rs.Spec.Driver,
+						Pool:   &rs.Spec.Pool.Name,
+						Device: &device.Name,
+					}
+					selectors = append(selectors, selector)
+				}
+			}
 		}
 	}
 
-	if cel == "" {
-		return ""
-	}
-
-	return fmt.Sprintf("cel.bind(%s, device.attributes['%s'], %s)", deviceTaintRuleDevice, deviceTaintRuleCELLabelGPUNvidia, cel)
+	return selectors, nil
 }
 
 // reconcileCompleted is a function to reconcile CardAlert in Completed.
@@ -948,7 +965,8 @@ func (r *CardAlertReconciler) reconcileCompleted(
 	}
 
 	logger.Info("Expired CardAlert is deleted successfully")
-	r.Recorder.Event(ca, corev1.EventTypeNormal, eventReasonExpired, "CardAlert is deleted after TTL expiration")
+	r.Recorder.Eventf(ca, nil, corev1.EventTypeNormal, eventReasonExpired, eventActionReconciling,
+		"CardAlert is deleted after TTL expiration")
 	return ctrl.Result{}, nil
 }
 
@@ -1010,7 +1028,7 @@ func (r *CardAlertReconciler) doFinalize(
 
 	if err != nil {
 		err = fmt.Errorf("failed to execute Finalizer process for state '%s': %w", lastCA.Status.State, err)
-		r.Recorder.Event(ca, corev1.EventTypeWarning, eventReason, err.Error())
+		r.Recorder.Eventf(ca, nil, corev1.EventTypeWarning, eventReason, eventActionReconciling, err.Error())
 	}
 
 	return rslt, err

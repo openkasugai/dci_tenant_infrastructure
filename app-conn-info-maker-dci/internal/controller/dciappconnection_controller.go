@@ -1,23 +1,10 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
 	examplecomv1 "app-conn-info-maker-dci/api/v1"
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -48,11 +35,16 @@ type DCIAppConnectionReconciler struct {
 }
 
 const (
-	DCIAppConnectionReconcilerInterval = 1
+	DCIAppConnectionReconcilerInterval  = 1
+	StringNone                          = "None"
+	ServiceKey                          = "kubernetes.io/service-name"
+	DCIAppConnectionRateLimiterMaxDelay = 5 * time.Minute
+	DCIAppConnectionRateLimiterRPS      = 10
+	DCIAppConnectionRateLimiterBurst    = 100
 )
 
 const (
-	DCIAppConnectionEventKindNone   = "None"
+	DCIAppConnectionEventKindNone   = StringNone
 	DCIAppConnectionEventKindCreate = "Create"
 	DCIAppConnectionEventKindUpdate = "Update"
 	DCIAppConnectionEventKindDelete = "Delete"
@@ -86,9 +78,8 @@ type DCIAppConnectionEventPredicate struct {
 // the user.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.24.1/pkg/reconcile
 func (r *DCIAppConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
 	stCtrlResult := ctrl.Result{}
 	var err error
 
@@ -96,11 +87,10 @@ func (r *DCIAppConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	bProcFlag := false
 	cFuncName := getFuncName()
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		pstCRData := &examplecomv1.DCIAppConnection{}
 		err = r.Get(ctx, req.NamespacedName, pstCRData)
-		if nil != err {
+		if err != nil {
 			if errors.IsNotFound(err) {
 				log.Info(cFuncName + " could not find DCIAppConnectionCR." +
 					" Name: " + req.Name +
@@ -119,11 +109,41 @@ func (r *DCIAppConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		stFromPodInfos := examplecomv1.FromPodInfos{}
 		stToPodInfos := examplecomv1.ToPodInfos{}
 		stToPodInfos.ToPodInfos = make(map[int]examplecomv1.ToPods)
+		stFromDeploymentInfos := examplecomv1.FromDeploymentInfos{}
+		stToDeploymentInfos := examplecomv1.ToDeploymentInfos{}
+		stToDeploymentInfos.ToDeploymentInfos = make(map[int]examplecomv1.ToDeployments)
 
 		// Get the event type
 		cFinalizerName := getFinalizerName(r.Client, pstCRData)
 		cEventKind := r.getEventKind(pstCRData, cFinalizerName)
 		var bFuncRet bool
+
+		if DCIAppConnectionEventKindUpdate == cEventKind {
+			bFuncRet = chkConnectionRelation(
+				ctx,
+				log,
+				pstCRData)
+			if bFuncRet {
+				if pstCRData.Status.Phase == examplecomv1.StatusPhasePending {
+					pstBaseCRDData := client.MergeFrom(pstCRData.DeepCopy())
+					pstCRData.Status.Phase = examplecomv1.StatusPhaseCreated
+					log.Info(cFuncName + " sets DCIAppConnectionCR Phase to Created.")
+
+					err = r.Patch(ctx, pstCRData, pstBaseCRDData)
+					if err != nil {
+						log.Error(err, cFuncName+" failed to patch DCIAppConnectionCR."+
+							" Name: "+pstCRData.Name+
+							", Namespace: "+pstCRData.Namespace)
+						break
+					}
+					log.Info(cFuncName + " patched DCIAppConnectionCR successfully." +
+						" Name: " + pstCRData.Name +
+						", Namespace: " + pstCRData.Namespace)
+				}
+				bProcFlag = true
+				break
+			}
+		}
 
 		if DCIAppConnectionEventKindCreate == cEventKind {
 			bAdditionalProcFlag := true
@@ -134,7 +154,7 @@ func (r *DCIAppConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				bAdditionalProcFlag,
 				&stFromPodInfos,
 				&stToPodInfos)
-			if nil != err {
+			if err != nil {
 				break
 			}
 			if bFuncRet {
@@ -145,37 +165,81 @@ func (r *DCIAppConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					cFinalizerName,
 					&stFromPodInfos,
 					&stToPodInfos)
-				if nil != err {
+				if err != nil {
 					break
 				}
 			}
 
 			if bFuncRet {
 				bProcFlag = true
-			} else {
-				if len(pstCRData.Status.Phase) == 0 {
-					pstBaseCRDData := client.MergeFrom(pstCRData.DeepCopy())
-					pstCRData.Status.Phase = examplecomv1.StatusPhasePending
-					log.Info(cFuncName + " sets DCIAppConnectionCR Phase to Pending.")
+			} else if pstCRData.Status.Phase == "" {
+				pstBaseCRDData := client.MergeFrom(pstCRData.DeepCopy())
+				pstCRData.Status.Phase = examplecomv1.StatusPhasePending
+				log.Info(cFuncName + " sets DCIAppConnectionCR Phase to Pending.")
 
-					err = r.Patch(ctx, pstCRData, pstBaseCRDData)
-					if nil != err {
-						log.Error(err, cFuncName+" failed to patch DCIAppConnectionCR."+
-							" Name: "+pstCRData.Name+
-							", Namespace: "+pstCRData.Namespace)
-						break
-					}
-					log.Info(cFuncName + " patched DCIAppConnectionCR successfully." +
-						" Name: " + pstCRData.Name +
-						", Namespace: " + pstCRData.Namespace)
+				err = r.Patch(ctx, pstCRData, pstBaseCRDData)
+				if err != nil {
+					log.Error(err, cFuncName+" failed to patch DCIAppConnectionCR."+
+						" Name: "+pstCRData.Name+
+						", Namespace: "+pstCRData.Namespace)
+					break
 				}
+				log.Info(cFuncName + " patched DCIAppConnectionCR successfully." +
+					" Name: " + pstCRData.Name +
+					", Namespace: " + pstCRData.Namespace)
 			}
 		} else if DCIAppConnectionEventKindUpdate == cEventKind {
-			bProcFlag = true
+			bAdditionalProcFlag := true
+			err, bFuncRet = r.getConnectionRelation(
+				ctx,
+				log,
+				pstCRData,
+				bAdditionalProcFlag,
+				&stFromPodInfos,
+				&stToPodInfos)
+			if err != nil {
+				break
+			}
 
-			// do nothing
-			log.Info(cFuncName + " has no action for the update event of DCIAppConnectionCR.")
+			if bFuncRet {
+				getStatusRelation(
+					ctx,
+					log,
+					pstCRData,
+					&stFromDeploymentInfos,
+					&stToDeploymentInfos)
+				err = r.reconcileUpdate(
+					ctx,
+					log,
+					pstCRData,
+					cFinalizerName,
+					&stFromPodInfos,
+					&stToPodInfos,
+					&stFromDeploymentInfos,
+					&stToDeploymentInfos)
+				if err != nil {
+					break
+				}
+			}
 
+			if bFuncRet {
+				bProcFlag = true
+			} else if pstCRData.Status.Phase != examplecomv1.StatusPhasePending {
+				pstBaseCRDData := client.MergeFrom(pstCRData.DeepCopy())
+				pstCRData.Status.Phase = examplecomv1.StatusPhasePending
+				log.Info(cFuncName + " sets DCIAppConnectionCR Phase to Pending.")
+
+				err = r.Patch(ctx, pstCRData, pstBaseCRDData)
+				if err != nil {
+					log.Error(err, cFuncName+" failed to patch DCIAppConnectionCR."+
+						" Name: "+pstCRData.Name+
+						", Namespace: "+pstCRData.Namespace)
+					break
+				}
+				log.Info(cFuncName + " patched DCIAppConnectionCR successfully." +
+					" Name: " + pstCRData.Name +
+					", Namespace: " + pstCRData.Namespace)
+			}
 		} else if DCIAppConnectionEventKindDelete == cEventKind {
 			bAdditionalProcFlag := false
 			// The second return value cannot be false when deleting,
@@ -187,7 +251,7 @@ func (r *DCIAppConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				bAdditionalProcFlag,
 				&stFromPodInfos,
 				&stToPodInfos)
-			if nil != err {
+			if err != nil {
 				break
 			}
 
@@ -198,7 +262,7 @@ func (r *DCIAppConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				cFinalizerName,
 				&stFromPodInfos,
 				&stToPodInfos)
-			if nil != err {
+			if err != nil {
 				break
 			}
 			bProcFlag = true
@@ -210,16 +274,20 @@ func (r *DCIAppConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	} // SA4008: This loop is intentionally only a one-time loop
 
-	if nil != err {
+	if err != nil {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = false
 	} else if bProcFlag {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = false
 	} else {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = true
 		stCtrlResult.RequeueAfter =
 			time.Second * DCIAppConnectionReconcilerInterval
 	}
 
+	//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 	log.Info(cFuncName + " return." +
 		" stCtrlResult.Requeue: " + strconv.FormatBool(stCtrlResult.Requeue) +
 		", stCtrlResult.RequeueAfter: " + stCtrlResult.RequeueAfter.String() +
@@ -249,7 +317,7 @@ func (DCIAppConnectionEventPredicate) Update(e event.UpdateEvent) bool {
 	return bProcFlag
 }
 
-func (DCIAppConnectionEventPredicate) Create(e event.CreateEvent) bool {
+func (DCIAppConnectionEventPredicate) Create(_ event.CreateEvent) bool {
 	return true
 }
 
@@ -261,12 +329,12 @@ func (r *DCIAppConnectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			RateLimiter: workqueue.NewTypedMaxOfRateLimiter(
 				workqueue.NewTypedItemExponentialFailureRateLimiter[ctrl.Request](
 					1*time.Second,
-					5*time.Minute,
+					DCIAppConnectionRateLimiterMaxDelay,
 				),
 				&workqueue.TypedBucketRateLimiter[ctrl.Request]{
 					Limiter: rate.NewLimiter(
-						rate.Limit(10),
-						100,
+						rate.Limit(DCIAppConnectionRateLimiterRPS),
+						DCIAppConnectionRateLimiterBurst,
 					),
 				},
 			),
@@ -279,14 +347,12 @@ func (r *DCIAppConnectionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *DCIAppConnectionReconciler) getEventKind(
+func (*DCIAppConnectionReconciler) getEventKind(
 	pstCRData *examplecomv1.DCIAppConnection,
 	cFinalizerName string) string {
-
 	cEventKind := DCIAppConnectionEventKindNone
 
 	if !controllerutil.ContainsFinalizer(pstCRData, cFinalizerName) {
-
 		if !pstCRData.DeletionTimestamp.IsZero() {
 			// do nothing
 		} else {
@@ -317,7 +383,7 @@ func (r *DCIAppConnectionReconciler) getConnectionRelation(
 		" bAdditionalProcFlag: " + strconv.FormatBool(bAdditionalProcFlag))
 	var bFuncRet bool
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
+	for range 1 {
 		err, bFuncRet = r.getConnectionRelationship(
 			ctx,
 			log,
@@ -325,41 +391,37 @@ func (r *DCIAppConnectionReconciler) getConnectionRelation(
 			bAdditionalProcFlag,
 			pstFromPodInfos,
 			pstToPodInfos)
-		if nil != err {
+		if err != nil {
 			break
 		}
 		if !bFuncRet {
 			break
 		}
 
-		if pstCRData.Spec.InputEndpoint != nil {
-			err, bFuncRet = r.getConnectionRelationshipInput(
-				ctx,
-				log,
-				pstCRData,
-				bAdditionalProcFlag,
-				pstFromPodInfos)
-			if nil != err {
-				break
-			}
-			if !bFuncRet {
-				break
-			}
+		err, bFuncRet = r.getConnectionRelationshipInput(
+			ctx,
+			log,
+			pstCRData,
+			bAdditionalProcFlag,
+			pstFromPodInfos)
+		if err != nil {
+			break
+		}
+		if !bFuncRet {
+			break
 		}
 
-		if pstCRData.Spec.OutputEndpoint != nil {
-			err, bFuncRet = r.getConnectionRelationshipOutput(
-				ctx,
-				log,
-				pstCRData,
-				bAdditionalProcFlag,
-				pstFromPodInfos)
-			if nil != err {
-				break
-			}
-			if !bFuncRet {
-				break
-			}
+		err, bFuncRet = r.getConnectionRelationshipOutput(
+			ctx,
+			log,
+			pstCRData,
+			bAdditionalProcFlag,
+			pstFromPodInfos)
+		if err != nil {
+			break
+		}
+		if !bFuncRet {
+			break
 		}
 
 		bProcFlag = true
@@ -369,6 +431,651 @@ func (r *DCIAppConnectionReconciler) getConnectionRelation(
 		" bProcFlag: " + strconv.FormatBool(bProcFlag) +
 		", err: " + fmt.Sprint(err))
 	return err, bProcFlag
+}
+
+func (r *DCIAppConnectionReconciler) addToConnection(
+	ctx context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	cFinalizerName string,
+	cLabelKey string,
+	cLabelVal string,
+	pstToPodInfos *examplecomv1.ToPodInfos,
+	iConnIdx int,
+	bFromExistFlag bool) (sDeployments, sPods, sServices, sEndpointSlices []types.NamespacedName, err error) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start." +
+		" bFromExistFlag: " + strconv.FormatBool(bFromExistFlag))
+
+	for range 1 {
+		stToPodInfo := pstToPodInfos.ToPodInfos[iConnIdx]
+		bExistFlag := false
+		if stToPodInfo.DeploymentR != nil {
+			for iConnChkIndex := range iConnIdx {
+				if pstToPodInfos.ToPodInfos[iConnChkIndex].DeploymentRef.Name ==
+					stToPodInfo.DeploymentR.Name &&
+					pstToPodInfos.ToPodInfos[iConnChkIndex].DeploymentRef.Namespace ==
+						stToPodInfo.DeploymentR.Namespace {
+					bExistFlag = true
+					break
+				}
+			}
+			if !bExistFlag {
+				err = r.registDciService(
+					ctx,
+					log,
+					pstCRData,
+					iConnIdx,
+					pstToPodInfos,
+					&sServices,
+					&sEndpointSlices)
+				if err != nil {
+					break
+				}
+
+				if !bFromExistFlag {
+					err = setDciDeploymentConnectionRelationship(
+						ctx,
+						r.Client,
+						log,
+						cLabelKey,
+						cLabelVal,
+						cFinalizerName,
+						stToPodInfo.DeploymentR)
+					if err != nil {
+						break
+					}
+
+					sDeployments = append(sDeployments, types.NamespacedName{
+						Namespace: stToPodInfo.DeploymentR.Namespace,
+						Name:      stToPodInfo.DeploymentR.Name,
+					})
+
+					for _, stToPod := range stToPodInfo.ToPods {
+						if !stToPod.DeleteFlag {
+							err = setDciPodConnectionRelationship(
+								ctx,
+								r.Client,
+								log,
+								cLabelKey,
+								cLabelVal,
+								cFinalizerName,
+								stToPod.PodR)
+							if err != nil {
+								break
+							}
+
+							sPods = append(sPods, types.NamespacedName{
+								Namespace: stToPod.PodR.Namespace,
+								Name:      stToPod.PodR.Name,
+							})
+						}
+					}
+					if err != nil {
+						break
+					}
+				}
+			}
+		}
+	}
+	log.Info(cFuncName + " End." +
+		" err: " + fmt.Sprint(err))
+	return sDeployments, sPods, sServices, sEndpointSlices, err
+}
+
+func (r *DCIAppConnectionReconciler) addFromConnection(
+	ctx context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	cFinalizerName string,
+	cLabelKey string,
+	cLabelVal string,
+	pstFromPod *examplecomv1.FromPodInfo,
+	pstToPodInfos *examplecomv1.ToPodInfos,
+	bToExistFlag bool) (sDeployments, sPods, sConnectEndpoints []types.NamespacedName, err error) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start." +
+		" bToExistFlag: " + strconv.FormatBool(bToExistFlag))
+
+	cDeploymentName := pstFromPod.DeploymentRef.Name
+	cDeploymentNamespace := pstFromPod.DeploymentRef.Namespace
+
+	for range 1 {
+		if !bToExistFlag {
+			bExistFlag := false
+			for _, stToPodInfo := range pstToPodInfos.ToPodInfos {
+				if stToPodInfo.DeploymentRef.Name == cDeploymentName &&
+					stToPodInfo.DeploymentRef.Namespace == cDeploymentNamespace {
+					bExistFlag = true
+					break
+				}
+			}
+
+			if !bExistFlag {
+				if pstFromPod.MstPodFlag {
+					if pstFromPod.DeploymentR != nil {
+						err = setDciDeploymentConnectionRelationship(
+							ctx,
+							r.Client,
+							log,
+							cLabelKey,
+							cLabelVal,
+							cFinalizerName,
+							pstFromPod.DeploymentR)
+						if err != nil {
+							break
+						}
+						sDeployments = append(sDeployments, types.NamespacedName{
+							Namespace: pstFromPod.DeploymentR.Namespace,
+							Name:      pstFromPod.DeploymentR.Name,
+						})
+					}
+				}
+
+				if !pstFromPod.DeleteFlag && pstFromPod.PodR != nil {
+					err = setDciPodConnectionRelationship(
+						ctx,
+						r.Client,
+						log,
+						cLabelKey,
+						cLabelVal,
+						cFinalizerName,
+						pstFromPod.PodR)
+					if err != nil {
+						break
+					}
+					sPods = append(sPods, types.NamespacedName{
+						Namespace: pstFromPod.PodR.Namespace,
+						Name:      pstFromPod.PodR.Name,
+					})
+				}
+			}
+		}
+
+		if pstFromPod.PodR != nil {
+			err = makeConnectEndpoint(
+				ctx,
+				r.Client,
+				log,
+				r.Scheme,
+				pstCRData,
+				pstFromPod,
+				pstToPodInfos)
+			if err != nil {
+				break
+			}
+			sConnectEndpoints =
+				append(sConnectEndpoints, types.NamespacedName{
+					Namespace: pstCRData.Namespace,
+					Name:      pstFromPod.PodR.Name,
+				})
+		}
+	}
+	log.Info(cFuncName + " End." +
+		" err: " + fmt.Sprint(err))
+	return sDeployments, sPods, sConnectEndpoints, err
+}
+
+func (r *DCIAppConnectionReconciler) UpdateTriggeredCreate(
+	ctx context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	cFinalizerName string,
+	cLabelKey string,
+	cLabelVal string,
+	pstFromPodInfos *examplecomv1.FromPodInfos,
+	pstToPodInfos *examplecomv1.ToPodInfos,
+	pstFromDeploymentInfos *examplecomv1.FromDeploymentInfos,
+	pstToDeploymentInfos *examplecomv1.ToDeploymentInfos) error {
+	var err error
+
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	var sDeployments, sPods, sServices, sEndpointSlices, sConnectEndpoints []types.NamespacedName
+	var sUpdateConnectEndpointCRs []*examplecomv1.ConnectEndpoint
+
+	for range 1 {
+		for iConnIdx := range len(pstToPodInfos.ToPodInfos) {
+			stToPodInfo := pstToPodInfos.ToPodInfos[iConnIdx]
+
+			bExistToFlag := false
+			for iStatusIdx := range len(pstToDeploymentInfos.ToDeploymentInfos) {
+				if pstToDeploymentInfos.ToDeploymentInfos[iStatusIdx].DeploymentRef ==
+					stToPodInfo.DeploymentRef {
+					bExistToFlag = true
+					stToDeploymentInfo := pstToDeploymentInfos.ToDeploymentInfos[iStatusIdx]
+					stToDeploymentInfo.DeleteFlag = false
+					pstToDeploymentInfos.ToDeploymentInfos[iStatusIdx] = stToDeploymentInfo
+				}
+			}
+
+			bExistFromFlag := false
+			for iFromStatusIdx := range len(pstFromDeploymentInfos.FromDeployments) {
+				if pstFromDeploymentInfos.FromDeployments[iFromStatusIdx].DeploymentRef ==
+					stToPodInfo.DeploymentRef {
+					bExistFromFlag = true
+				}
+			}
+			if !bExistToFlag {
+				var sToDeployments, sToPods, sToServices, sToEndpointSlices []types.NamespacedName
+				sToDeployments, sToPods, sToServices, sToEndpointSlices, err = r.addToConnection(
+					ctx,
+					log,
+					pstCRData,
+					cFinalizerName,
+					cLabelKey,
+					cLabelVal,
+					pstToPodInfos,
+					iConnIdx,
+					bExistFromFlag)
+				if err != nil {
+					sDeployments = sToDeployments
+					sPods = sToPods
+					sServices = sToServices
+					sEndpointSlices = sToEndpointSlices
+					break
+				}
+				sDeployments = append(sDeployments, sToDeployments...)
+				sPods = append(sPods, sToPods...)
+				sServices = append(sServices, sToServices...)
+				sEndpointSlices = append(sEndpointSlices, sToEndpointSlices...)
+			}
+		}
+
+		if err != nil {
+			break
+		}
+
+		for iFromPodIdx := range len(pstFromPodInfos.FromPods) {
+			stFromPod := pstFromPodInfos.FromPods[iFromPodIdx]
+
+			bExistToFlag := false
+			for iStatusIdx := range len(pstToDeploymentInfos.ToDeploymentInfos) {
+				if pstToDeploymentInfos.ToDeploymentInfos[iStatusIdx].DeploymentRef ==
+					stFromPod.DeploymentRef {
+					bExistToFlag = true
+				}
+			}
+			bFromNotChangeFlag := true
+			bExistFromFlag := false
+			for iFromStatusIdx := range len(pstFromDeploymentInfos.FromDeployments) {
+				if pstFromDeploymentInfos.FromDeployments[iFromStatusIdx].DeploymentRef !=
+					stFromPod.DeploymentRef {
+					continue
+				}
+
+				bExistFromFlag = true
+				pstFromDeploymentInfos.FromDeployments[iFromStatusIdx].DeleteFlag = false
+
+				log.Info(cFuncName + " Status.Connections.From exist." +
+					" Name: " + stFromPod.DeploymentRef.Name +
+					", Namespace: " + stFromPod.DeploymentRef.Namespace)
+
+				stFromDeployment := pstFromDeploymentInfos.FromDeployments[iFromStatusIdx]
+				if len(stFromDeployment.DeploymentIndexs) ==
+					len(stFromPod.DeploymentIndexs) {
+					var iFromChkIdx int
+					for iFromChkIdx = 0; len(stFromPod.DeploymentIndexs) > iFromChkIdx; iFromChkIdx++ {
+						iSpecToIdx := stFromPod.DeploymentIndexs[iFromChkIdx]
+						iStatusToIdx := stFromDeployment.DeploymentIndexs[iFromChkIdx]
+						if pstToPodInfos.ToPodInfos[iSpecToIdx].DeploymentRef !=
+							pstToDeploymentInfos.ToDeploymentInfos[iStatusToIdx].DeploymentRef {
+							break
+						}
+					}
+					if len(stFromPod.DeploymentIndexs) != iFromChkIdx {
+						bFromNotChangeFlag = false
+						log.Info(cFuncName + " Status.Connections.To change." +
+							" Name: " + stFromPod.DeploymentRef.Name +
+							", Namespace: " + stFromPod.DeploymentRef.Namespace)
+					}
+					if !slices.Equal(stFromPod.InputSubsets, stFromDeployment.InputSubsets) {
+						bFromNotChangeFlag = false
+						log.Info(cFuncName + " Status.InputEndpoint.ExternalSubsets change." +
+							" Name: " + stFromPod.DeploymentRef.Name +
+							", Namespace: " + stFromPod.DeploymentRef.Namespace)
+					}
+					if !slices.Equal(stFromPod.OutputSubsets, stFromDeployment.OutputSubsets) {
+						bFromNotChangeFlag = false
+						log.Info(cFuncName + " Status.OutputEndpoint.ExternalSubsets change." +
+							" Name: " + stFromPod.DeploymentRef.Name +
+							", Namespace: " + stFromPod.DeploymentRef.Namespace)
+					}
+				} else {
+					bFromNotChangeFlag = false
+					log.Info(cFuncName + " Status.Connections.To len change." +
+						" Name: " + stFromPod.DeploymentRef.Name +
+						", Namespace: " + stFromPod.DeploymentRef.Namespace)
+				}
+				if stFromDeployment.IOMode != stFromPod.IOMode {
+					bFromNotChangeFlag = false
+					log.Info(cFuncName + " Status.Connections.From IOMode change." +
+						" Name: " + stFromPod.DeploymentRef.Name +
+						", Namespace: " + stFromPod.DeploymentRef.Namespace +
+						", IOMode: " + strconv.Itoa(stFromDeployment.IOMode) +
+						" -> " + strconv.Itoa(stFromPod.IOMode))
+				}
+			}
+			if !bExistFromFlag {
+				var sFromDeployments, sFromPods, sFromConnectEndpoints []types.NamespacedName
+				sFromDeployments, sFromPods, sFromConnectEndpoints, err = r.addFromConnection(
+					ctx,
+					log,
+					pstCRData,
+					cFinalizerName,
+					cLabelKey,
+					cLabelVal,
+					&stFromPod,
+					pstToPodInfos,
+					bExistToFlag)
+				sDeployments = append(sDeployments, sFromDeployments...)
+				sPods = append(sPods, sFromPods...)
+				if len(sFromConnectEndpoints) > 0 {
+					sConnectEndpoints = append(
+						sConnectEndpoints, sFromConnectEndpoints...)
+				}
+				if err != nil {
+					break
+				}
+			} else if !bFromNotChangeFlag {
+				bExistToFlag = true
+
+				var sFromConnectEndpoints []types.NamespacedName
+				_, _, sFromConnectEndpoints, err = r.addFromConnection(
+					ctx,
+					log,
+					pstCRData,
+					cFinalizerName,
+					cLabelKey,
+					cLabelVal,
+					&stFromPod,
+					pstToPodInfos,
+					bExistToFlag)
+				if len(sFromConnectEndpoints) > 0 {
+					if stFromPod.ConnectEndpointCR == nil {
+						sConnectEndpoints = append(
+							sConnectEndpoints, sFromConnectEndpoints...)
+					} else {
+						sUpdateConnectEndpointCRs = append(
+							sUpdateConnectEndpointCRs,
+							stFromPod.ConnectEndpointCR)
+					}
+				}
+				if err != nil {
+					break
+				}
+			}
+		}
+
+		if err != nil {
+			break
+		}
+
+		pstBaseCRDData := client.MergeFrom(pstCRData.DeepCopy())
+		pstCRData.Status.Connections = pstCRData.Spec.Connections
+		pstCRData.Status.InputEndpoints = pstCRData.Spec.InputEndpoints
+		pstCRData.Status.OutputEndpoints = pstCRData.Spec.OutputEndpoints
+
+		pstCRData.Status.Phase = examplecomv1.StatusPhaseCreated
+		log.Info(cFuncName + " sets DCIAppConnectionCR Phase to Created.")
+
+		err = r.Patch(ctx, pstCRData, pstBaseCRDData)
+		if err != nil {
+			log.Error(err, cFuncName+" failed to patch DCIAppConnectionCR."+
+				" Name: "+pstCRData.Name+
+				", Namespace: "+pstCRData.Namespace)
+			break
+		}
+
+		log.Info(cFuncName + " patched DCIAppConnectionCR successfully." +
+			" Name: " + pstCRData.Name +
+			", Namespace: " + pstCRData.Namespace)
+	}
+
+	if err != nil {
+		r.updateRollBack(
+			ctx,
+			log,
+			sUpdateConnectEndpointCRs)
+		r.createRollBack(
+			ctx,
+			log,
+			cLabelKey,
+			cFinalizerName,
+			sDeployments,
+			sPods,
+			sServices,
+			sEndpointSlices,
+			sConnectEndpoints)
+	}
+
+	log.Info(cFuncName + " End." +
+		" err: " + fmt.Sprint(err))
+	return err
+}
+
+func (r *DCIAppConnectionReconciler) delToConnection(
+	ctx context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	cFinalizerName string,
+	cLabelKey string,
+	pstToDeploymentInfos *examplecomv1.ToDeploymentInfos,
+	iConnIdx int,
+	bExistFromFlag bool) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start." +
+		" bExistFromFlag: " + strconv.FormatBool(bExistFromFlag))
+
+	stToDeploymentInfo := pstToDeploymentInfos.ToDeploymentInfos[iConnIdx]
+	bExistFlag := false
+	for iConnChkIndex := range iConnIdx {
+		if pstToDeploymentInfos.ToDeploymentInfos[iConnChkIndex].DeploymentRef ==
+			stToDeploymentInfo.DeploymentRef {
+			bExistFlag = true
+			break
+		}
+	}
+	if !bExistFlag {
+		r.deleteDciService(
+			ctx,
+			log,
+			pstCRData,
+			iConnIdx,
+			pstToDeploymentInfos)
+		if !bExistFromFlag {
+			bAdditionalProcFlag := false
+			bPodControllerFlag := false
+			bFuncRet, pstCRDeployment, pstCRPods, err := getDeploymentList(
+				ctx,
+				r.Client,
+				log,
+				stToDeploymentInfo.DeploymentRef.Name,
+				stToDeploymentInfo.DeploymentRef.Namespace,
+				bAdditionalProcFlag,
+				bPodControllerFlag)
+			if err == nil && bFuncRet {
+				log.Info(cFuncName + " set ToPod Info. Pod Count: " +
+					strconv.Itoa(len(pstCRPods.Items)))
+				for iPodIdx := range len(pstCRPods.Items) {
+					stCRPod := pstCRPods.Items[iPodIdx]
+					_ = unsetDciPodConnectionRelationship(
+						ctx,
+						r.Client,
+						log,
+						cLabelKey,
+						cFinalizerName,
+						&stCRPod)
+				}
+			}
+
+			if pstCRDeployment != nil {
+				_ = unsetDciDeploymentConnectionRelationship(
+					ctx,
+					r.Client,
+					log,
+					cLabelKey,
+					cFinalizerName,
+					pstCRDeployment)
+			}
+		}
+	}
+
+	log.Info(cFuncName + " End.")
+}
+
+func (r *DCIAppConnectionReconciler) delFromConnection(
+	ctx context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	cFinalizerName string,
+	cLabelKey string,
+	pstFromDeployment *examplecomv1.FromDeploymentInfo,
+	_ *examplecomv1.ToDeploymentInfos,
+	bExistToFlag bool) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start." +
+		" bExistToFlag: " + strconv.FormatBool(bExistToFlag))
+
+	for range 1 {
+		bAdditionalProcFlag := false
+		bPodControllerFlag := false
+		bFuncRet, pstCRDeployment, pstCRPods, err := getDeploymentList(
+			ctx,
+			r.Client,
+			log,
+			pstFromDeployment.DeploymentRef.Name,
+			pstFromDeployment.DeploymentRef.Namespace,
+			bAdditionalProcFlag,
+			bPodControllerFlag)
+		if err == nil && bFuncRet {
+			log.Info(cFuncName + " set FromPod Info. Pod Count: " +
+				strconv.Itoa(len(pstCRPods.Items)))
+
+			for iPodIdx := range len(pstCRPods.Items) {
+				stCRPod := pstCRPods.Items[iPodIdx]
+
+				pstConnectEndpoint := &examplecomv1.ConnectEndpoint{}
+				err = r.Get(ctx,
+					client.ObjectKey{
+						Name:      stCRPod.Name,
+						Namespace: pstCRData.Namespace,
+					}, pstConnectEndpoint)
+				if err != nil {
+					if !errors.IsNotFound(err) {
+						log.Error(err, cFuncName+" failed to get ConnectEndpointCR.")
+					}
+				} else {
+					if !pstConnectEndpoint.DeletionTimestamp.IsZero() {
+						log.Info(cFuncName +
+							" detected that ConnectEndpointCR has a DeletionTimestamp.")
+					} else {
+						_ = deleteConnectEndpoint(
+							ctx,
+							r.Client,
+							log,
+							pstConnectEndpoint)
+					}
+				}
+
+				if !bExistToFlag {
+					_ = unsetDciPodConnectionRelationship(
+						ctx,
+						r.Client,
+						log,
+						cLabelKey,
+						cFinalizerName,
+						&stCRPod)
+				}
+			}
+
+			if !bExistToFlag {
+				if pstCRDeployment != nil {
+					_ = unsetDciDeploymentConnectionRelationship(
+						ctx,
+						r.Client,
+						log,
+						cLabelKey,
+						cFinalizerName,
+						pstCRDeployment)
+				}
+			}
+		}
+	}
+
+	log.Info(cFuncName + " End.")
+}
+
+func (r *DCIAppConnectionReconciler) UpdateTriggeredDelete(
+	ctx context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	cFinalizerName string,
+	cLabelKey string,
+	_ string,
+	_ *examplecomv1.FromPodInfos,
+	pstToPodInfos *examplecomv1.ToPodInfos,
+	pstFromDeploymentInfos *examplecomv1.FromDeploymentInfos,
+	pstToDeploymentInfos *examplecomv1.ToDeploymentInfos) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	for iConnIdx, stToDeploymentInfo := range pstToDeploymentInfos.ToDeploymentInfos {
+		if !stToDeploymentInfo.DeleteFlag {
+			continue
+		}
+
+		bExistFromFlag := false
+		for iFromStatusIdx := range len(pstFromDeploymentInfos.FromDeployments) {
+			if pstFromDeploymentInfos.FromDeployments[iFromStatusIdx].DeploymentRef ==
+				stToDeploymentInfo.DeploymentRef {
+				if !pstFromDeploymentInfos.FromDeployments[iFromStatusIdx].DeleteFlag {
+					bExistFromFlag = true
+				}
+			}
+		}
+
+		r.delToConnection(
+			ctx,
+			log,
+			pstCRData,
+			cFinalizerName,
+			cLabelKey,
+			pstToDeploymentInfos,
+			iConnIdx,
+			bExistFromFlag)
+	}
+
+	for iFromDeploymentIdx := range len(pstFromDeploymentInfos.FromDeployments) {
+		stFromDeployment :=
+			pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx]
+		if !stFromDeployment.DeleteFlag {
+			continue
+		}
+
+		bExistToFlag := false
+		for iStatusIdx := range len(pstToPodInfos.ToPodInfos) {
+			if pstToPodInfos.ToPodInfos[iStatusIdx].DeploymentRef.Name ==
+				stFromDeployment.DeploymentRef.Name &&
+				pstToPodInfos.ToPodInfos[iStatusIdx].DeploymentRef.Namespace ==
+					stFromDeployment.DeploymentRef.Namespace {
+				bExistToFlag = true
+			}
+		}
+
+		r.delFromConnection(
+			ctx,
+			log,
+			pstCRData,
+			cFinalizerName,
+			cLabelKey,
+			&stFromDeployment,
+			pstToDeploymentInfos,
+			bExistToFlag)
+	}
+
+	log.Info(cFuncName + " End.")
 }
 
 func (r *DCIAppConnectionReconciler) reconcileCreate(
@@ -388,75 +1095,54 @@ func (r *DCIAppConnectionReconciler) reconcileCreate(
 
 	log.Info(cFuncName + " Start.")
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-		for iConnIdx := 0; len(pstToPodInfos.ToPodInfos) > iConnIdx; iConnIdx++ {
-			stToPodInfo := pstToPodInfos.ToPodInfos[iConnIdx]
-
-			err = r.registDciService(
+	for range 1 {
+		for iConnIdx := range len(pstToPodInfos.ToPodInfos) {
+			var sToDeployments, sToPods, sToServices, sToEndpointSlices []types.NamespacedName
+			sToDeployments, sToPods, sToServices, sToEndpointSlices, err = r.addToConnection(
 				ctx,
 				log,
 				pstCRData,
-				iConnIdx,
+				cFinalizerName,
+				cKind,
+				cVal,
 				pstToPodInfos,
-				&sServices,
-				&sEndpointSlices)
-			if nil != err {
+				iConnIdx,
+				false)
+			if err != nil {
+				sDeployments = sToDeployments
+				sPods = sToPods
+				sServices = sToServices
+				sEndpointSlices = sToEndpointSlices
 				break
 			}
+			sDeployments = append(sDeployments, sToDeployments...)
+			sPods = append(sPods, sToPods...)
+			sServices = append(sServices, sToServices...)
+			sEndpointSlices = append(sEndpointSlices, sToEndpointSlices...)
+		}
 
-			iConnExistFlag := false
-			if nil != stToPodInfo.DeploymentR {
-				for iConnChkIndex := 0; iConnIdx > iConnChkIndex; iConnChkIndex++ {
-					if pstToPodInfos.ToPodInfos[iConnChkIndex].DeploymentRef.Name ==
-						stToPodInfo.DeploymentR.Name &&
-						pstToPodInfos.ToPodInfos[iConnChkIndex].DeploymentRef.Namespace ==
-							stToPodInfo.DeploymentR.Namespace {
-						iConnExistFlag = true
-						break
-					}
-				}
-				if !iConnExistFlag {
-					err = setDciDeploymentConnectionRelationship(
-						ctx,
-						r.Client,
-						log,
-						cKind,
-						cVal,
-						cFinalizerName,
-						stToPodInfo.DeploymentR)
-					if nil != err {
-						break
-					}
+		if err != nil {
+			break
+		}
 
-					sDeployments = append(sDeployments, types.NamespacedName{
-						Namespace: stToPodInfo.DeploymentR.Namespace,
-						Name:      stToPodInfo.DeploymentR.Name,
-					})
-
-					for _, stToPod := range stToPodInfo.ToPods {
-						if !stToPod.DeleteFlag {
-							err = setDciPodConnectionRelationship(
-								ctx,
-								r.Client,
-								log,
-								cKind,
-								cVal,
-								cFinalizerName,
-								stToPod.PodR)
-							if err != nil {
-								break
-							}
-
-							sPods = append(sPods, types.NamespacedName{
-								Namespace: stToPod.PodR.Namespace,
-								Name:      stToPod.PodR.Name,
-							})
-						}
-					}
-					if err != nil {
-						break
-					}
-				}
+		for iFromPodIdx := range len(pstFromPodInfos.FromPods) {
+			stFromPod := pstFromPodInfos.FromPods[iFromPodIdx]
+			var sFromDeployments, sFromPods, sFromConnectEndpoints []types.NamespacedName
+			sFromDeployments, sFromPods, sFromConnectEndpoints, err = r.addFromConnection(
+				ctx,
+				log,
+				pstCRData,
+				cFinalizerName,
+				cKind,
+				cVal,
+				&stFromPod,
+				pstToPodInfos,
+				false)
+			sDeployments = append(sDeployments, sFromDeployments...)
+			sPods = append(sPods, sFromPods...)
+			sConnectEndpoints = append(sConnectEndpoints, sFromConnectEndpoints...)
+			if err != nil {
+				break
 			}
 		}
 
@@ -464,87 +1150,11 @@ func (r *DCIAppConnectionReconciler) reconcileCreate(
 			break
 		}
 
-		for iFromPodIdx := 0; len(pstFromPodInfos.FromPods) > iFromPodIdx; iFromPodIdx++ {
-			stFromPod := pstFromPodInfos.FromPods[iFromPodIdx]
-			cDeploymentName := stFromPod.DeploymentRef.Name
-			cDeploymentNamespace := stFromPod.DeploymentRef.Namespace
-
-			bExistFlag := false
-			for _, stToPodInfo := range pstToPodInfos.ToPodInfos {
-				if stToPodInfo.DeploymentRef.Name == cDeploymentName &&
-					stToPodInfo.DeploymentRef.Namespace == cDeploymentNamespace {
-					bExistFlag = true
-					break
-				}
-			}
-
-			if !bExistFlag {
-				if stFromPod.MstPodFlag {
-					if nil != stFromPod.DeploymentR {
-						err = setDciDeploymentConnectionRelationship(
-							ctx,
-							r.Client,
-							log,
-							cKind,
-							cVal,
-							cFinalizerName,
-							stFromPod.DeploymentR)
-						if nil != err {
-							break
-						}
-						sDeployments = append(sDeployments, types.NamespacedName{
-							Namespace: stFromPod.DeploymentR.Namespace,
-							Name:      stFromPod.DeploymentR.Name,
-						})
-					}
-				}
-
-				if !stFromPod.DeleteFlag && stFromPod.PodR != nil {
-					err = setDciPodConnectionRelationship(
-						ctx,
-						r.Client,
-						log,
-						cKind,
-						cVal,
-						cFinalizerName,
-						stFromPod.PodR)
-					if nil != err {
-						break
-					}
-					sPods = append(sPods, types.NamespacedName{
-						Namespace: stFromPod.PodR.Namespace,
-						Name:      stFromPod.PodR.Name,
-					})
-				}
-			}
-
-			if stFromPod.PodR != nil {
-				err = makeConnectEndpoint(
-					ctx,
-					r.Client,
-					log,
-					r.Scheme,
-					pstCRData,
-					&stFromPod,
-					pstToPodInfos)
-				if nil != err {
-					break
-				}
-			}
-
-			if stFromPod.ConnectEndpointCR != nil {
-				sConnectEndpoints = append(sConnectEndpoints, types.NamespacedName{
-					Namespace: stFromPod.ConnectEndpointCR.Namespace,
-					Name:      stFromPod.ConnectEndpointCR.Name,
-				})
-			}
-		}
-
-		if nil != err {
-			break
-		}
-
 		pstBaseCRDData := client.MergeFrom(pstCRData.DeepCopy())
+		pstCRData.Status.Connections = pstCRData.Spec.Connections
+		pstCRData.Status.InputEndpoints = pstCRData.Spec.InputEndpoints
+		pstCRData.Status.OutputEndpoints = pstCRData.Spec.OutputEndpoints
+
 		pstCRData.Status.Phase = examplecomv1.StatusPhaseCreated
 		log.Info(cFuncName + " sets DCIAppConnectionCR Phase to Created.")
 
@@ -552,7 +1162,7 @@ func (r *DCIAppConnectionReconciler) reconcileCreate(
 		log.Info(cFuncName + " added a finalizer to DCIAppConnectionCR.")
 
 		err = r.Patch(ctx, pstCRData, pstBaseCRDData)
-		if nil != err {
+		if err != nil {
 			log.Error(err, cFuncName+" failed to patch DCIAppConnectionCR."+
 				" Name: "+pstCRData.Name+
 				", Namespace: "+pstCRData.Namespace)
@@ -564,7 +1174,7 @@ func (r *DCIAppConnectionReconciler) reconcileCreate(
 			", Namespace: " + pstCRData.Namespace)
 	}
 
-	if nil != err {
+	if err != nil {
 		r.createRollBack(
 			ctx,
 			log,
@@ -576,6 +1186,55 @@ func (r *DCIAppConnectionReconciler) reconcileCreate(
 			sEndpointSlices,
 			sConnectEndpoints)
 	}
+	log.Info(cFuncName + " End." +
+		" err: " + fmt.Sprint(err))
+	return err
+}
+
+func (r *DCIAppConnectionReconciler) reconcileUpdate(
+	ctx context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	cFinalizerName string,
+	pstFromPodInfos *examplecomv1.FromPodInfos,
+	pstToPodInfos *examplecomv1.ToPodInfos,
+	pstFromDeploymentInfos *examplecomv1.FromDeploymentInfos,
+	pstToDeploymentInfos *examplecomv1.ToDeploymentInfos) error {
+	var err error
+
+	gvks, _, _ := r.Client.Scheme().ObjectKinds(pstCRData)
+	cKind := strings.ToLower(gvks[0].Kind)
+	cVal := pstCRData.Name + "_" + pstCRData.Namespace
+
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	err = r.UpdateTriggeredCreate(
+		ctx,
+		log,
+		pstCRData,
+		cFinalizerName,
+		cKind,
+		cVal,
+		pstFromPodInfos,
+		pstToPodInfos,
+		pstFromDeploymentInfos,
+		pstToDeploymentInfos)
+
+	if err == nil {
+		r.UpdateTriggeredDelete(
+			ctx,
+			log,
+			pstCRData,
+			cFinalizerName,
+			cKind,
+			cVal,
+			pstFromPodInfos,
+			pstToPodInfos,
+			pstFromDeploymentInfos,
+			pstToDeploymentInfos)
+	}
+
 	log.Info(cFuncName + " End." +
 		" err: " + fmt.Sprint(err))
 	return err
@@ -596,14 +1255,13 @@ func (r *DCIAppConnectionReconciler) reconcileDelete(
 
 	log.Info(cFuncName + " Start.")
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
-		for iConnIdx := 0; len(pstToPodInfos.ToPodInfos) > iConnIdx; iConnIdx++ {
+	for range 1 {
+		for iConnIdx := range len(pstToPodInfos.ToPodInfos) {
 			stToPodInfo := pstToPodInfos.ToPodInfos[iConnIdx]
 			iConnExistFlag := false
 
 			if stToPodInfo.DeploymentR != nil {
-				for iConnChkIndex := 0; iConnIdx > iConnChkIndex; iConnChkIndex++ {
+				for iConnChkIndex := range iConnIdx {
 					if pstToPodInfos.ToPodInfos[iConnChkIndex].DeploymentRef.Name ==
 						stToPodInfo.DeploymentR.Name &&
 						pstToPodInfos.ToPodInfos[iConnChkIndex].DeploymentRef.Namespace ==
@@ -634,7 +1292,7 @@ func (r *DCIAppConnectionReconciler) reconcileDelete(
 			}
 		}
 
-		for iFromPodIdx := 0; len(pstFromPodInfos.FromPods) > iFromPodIdx; iFromPodIdx++ {
+		for iFromPodIdx := range len(pstFromPodInfos.FromPods) {
 			stFromPod := pstFromPodInfos.FromPods[iFromPodIdx]
 
 			cDeploymentName := stFromPod.DeploymentRef.Name
@@ -681,7 +1339,7 @@ func (r *DCIAppConnectionReconciler) reconcileDelete(
 		log.Info(cFuncName + " removed the finalizer from DCIAppConnectionCR.")
 
 		err = r.Patch(ctx, pstCRData, pstBaseCRDData)
-		if nil != err {
+		if err != nil {
 			log.Error(err, cFuncName+" failed to patch DCIAppConnectionCR."+
 				" Name: "+pstCRData.Name+
 				", Namespace: "+pstCRData.Namespace)
@@ -704,7 +1362,6 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationship(
 	bAdditionalProcFlag bool,
 	pstFromPodInfos *examplecomv1.FromPodInfos,
 	pstToPodInfos *examplecomv1.ToPodInfos) (error, bool) {
-
 	var err error
 	bProcFlag := true
 
@@ -712,32 +1369,23 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationship(
 	log.Info(cFuncName + " Start." +
 		" bAdditionalProcFlag: " + strconv.FormatBool(bAdditionalProcFlag))
 
-	var outDeploymentRef examplecomv1.NamespaceName
-	var inDeploymentRef examplecomv1.NamespaceName
-	if pstCRData.Spec.OutputEndpoint != nil {
-		outDeploymentRef =
-			pstCRData.Spec.OutputEndpoint.Internal.DeploymentRef
-	}
-	if pstCRData.Spec.InputEndpoint != nil {
-		inDeploymentRef =
-			pstCRData.Spec.InputEndpoint.Internal.DeploymentRef
+	arConnections := pstCRData.Spec.Connections
+	if !bAdditionalProcFlag {
+		arConnections = pstCRData.Status.Connections
 	}
 
 	// Connections Relation
-	for iConnIdx := 0; len(pstCRData.Spec.Connections) > iConnIdx; iConnIdx++ {
-
-		pstConnection := pstCRData.Spec.Connections[iConnIdx]
+	for iConnIdx := range arConnections {
+		pstConnection := arConnections[iConnIdx]
 		bDupFlag := false
 
-		for iFromPodIdx := 0; len(pstFromPodInfos.FromPods) > iFromPodIdx; iFromPodIdx++ {
-
+		for iFromPodIdx := range len(pstFromPodInfos.FromPods) {
 			stFromPod := pstFromPodInfos.FromPods[iFromPodIdx]
 			cDeploymentName := stFromPod.DeploymentRef.Name
 			cDeploymentNamespace := stFromPod.DeploymentRef.Namespace
 
 			if cDeploymentName == pstConnection.From.DeploymentRef.Name &&
 				cDeploymentNamespace == pstConnection.From.DeploymentRef.Namespace {
-
 				stFromPod.DeploymentIndexs = append(
 					stFromPod.DeploymentIndexs,
 					iConnIdx)
@@ -752,26 +1400,8 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationship(
 		}
 
 		if !bDupFlag {
-			iIOMode := examplecomv1.IOModeNONE
-
-			if pstConnection.From.DeploymentRef.Name ==
-				inDeploymentRef.Name &&
-				pstConnection.From.DeploymentRef.Namespace ==
-					inDeploymentRef.Namespace {
-				iIOMode |= examplecomv1.IOModeIN
-			}
-
-			if pstConnection.From.DeploymentRef.Name ==
-				outDeploymentRef.Name &&
-				pstConnection.From.DeploymentRef.Namespace ==
-					outDeploymentRef.Namespace {
-				iIOMode |= examplecomv1.IOModeOUT
-			}
-
-			log.Info(cFuncName + " set FromPod Info." +
-				" Index: " + strconv.Itoa(iConnIdx) +
-				", Name: " + pstConnection.From.DeploymentRef.Name)
-
+			var arInputSubsets []string
+			var arOutputSubsets []string
 			var bFuncRet bool
 			err, bFuncRet = getFromConnectionInformation(
 				ctx,
@@ -781,12 +1411,14 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationship(
 				pstConnection.From.DeploymentRef.Namespace,
 				pstCRData.Name,
 				pstCRData.Namespace,
+				arInputSubsets,
+				arOutputSubsets,
 				bAdditionalProcFlag,
 				false,
 				pstFromPodInfos,
 				iConnIdx,
-				iIOMode)
-			if nil != err {
+				examplecomv1.IOModeNONE)
+			if err != nil {
 				break
 			}
 			if !bFuncRet {
@@ -818,7 +1450,7 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationship(
 			false,
 			pstToPodInfos,
 			iConnIdx)
-		if nil != err {
+		if err != nil {
 			bProcFlag = false
 			break
 		}
@@ -840,7 +1472,6 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationshipInput(
 	pstCRData *examplecomv1.DCIAppConnection,
 	bAdditionalProcFlag bool,
 	pstFromPodInfos *examplecomv1.FromPodInfos) (error, bool) {
-
 	var err error
 	bProcFlag := true
 
@@ -848,56 +1479,86 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationshipInput(
 	log.Info(cFuncName + " Start." +
 		" bAdditionalProcFlag: " + strconv.FormatBool(bAdditionalProcFlag))
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
-		inDeploymentRef :=
-			pstCRData.Spec.InputEndpoint.Internal.DeploymentRef
-
-		var outDeploymentRef examplecomv1.NamespaceName
-		if pstCRData.Spec.OutputEndpoint != nil {
-			outDeploymentRef =
-				pstCRData.Spec.OutputEndpoint.Internal.DeploymentRef
+	for range 1 {
+		arInputEndpoints := pstCRData.Spec.InputEndpoints
+		if !bAdditionalProcFlag {
+			arInputEndpoints = pstCRData.Status.InputEndpoints
 		}
 
-		bConnExistFlag := false
-		for _, connections := range pstCRData.Spec.Connections {
+		for iInIdx := range arInputEndpoints {
+			inDeploymentRef :=
+				arInputEndpoints[iInIdx].Internal.DeploymentRef
 
-			if inDeploymentRef.Name == connections.From.DeploymentRef.Name &&
-				inDeploymentRef.Namespace == connections.From.DeploymentRef.Namespace {
-				bConnExistFlag = true
-				break
+			bConnExistFlag := false
+			for iFromPodIdx := range len(pstFromPodInfos.FromPods) {
+				stFromPod := pstFromPodInfos.FromPods[iFromPodIdx]
+				if inDeploymentRef.Name == stFromPod.DeploymentRef.Name &&
+					inDeploymentRef.Namespace == stFromPod.DeploymentRef.Namespace {
+					bConnExistFlag = true
+					arInputSubsets := stFromPod.InputSubsets
+					for iSubIdx := range len(arInputEndpoints[iInIdx].ExternalSubsets) {
+						var iFromSubIdx int
+						for iFromSubIdx = 0; len(arInputSubsets) > iFromSubIdx; iFromSubIdx++ {
+							if arInputEndpoints[iInIdx].ExternalSubsets[iSubIdx] ==
+								arInputSubsets[iFromSubIdx] {
+								break
+							}
+						}
+						if len(arInputSubsets) == iFromSubIdx {
+							arInputSubsets = append(arInputSubsets,
+								arInputEndpoints[iInIdx].ExternalSubsets[iSubIdx])
+						}
+					}
+					pstFromPodInfos.FromPods[iFromPodIdx].InputSubsets = arInputSubsets
+					pstFromPodInfos.FromPods[iFromPodIdx].IOMode |= examplecomv1.IOModeIN
+					log.Info(cFuncName + " set the InputSubsets Info in the FromPod." +
+						" InputSubsets len: " +
+						strconv.Itoa(len(pstFromPodInfos.FromPods[iFromPodIdx].InputSubsets)) +
+						", Name: " + inDeploymentRef.Name)
+				}
 			}
-		}
 
-		if !bConnExistFlag {
-			// InputEndpoint Relation
-			iIOMode := examplecomv1.IOModeIN
-			if inDeploymentRef.Name == outDeploymentRef.Name &&
-				inDeploymentRef.Namespace == outDeploymentRef.Namespace {
-				iIOMode = examplecomv1.IOModeINOUT
-			}
+			if !bConnExistFlag {
+				var arInputSubsets []string
+				for iSubIdx := range len(arInputEndpoints[iInIdx].ExternalSubsets) {
+					var iFromSubIdx int
+					for iFromSubIdx = 0; len(arInputSubsets) > iFromSubIdx; iFromSubIdx++ {
+						if arInputEndpoints[iInIdx].ExternalSubsets[iSubIdx] ==
+							arInputSubsets[iFromSubIdx] {
+							break
+						}
+					}
+					if len(arInputSubsets) == iFromSubIdx {
+						arInputSubsets = append(arInputSubsets,
+							arInputEndpoints[iInIdx].ExternalSubsets[iSubIdx])
+					}
+				}
+				var arOutputSubsets []string
 
-			var bFuncRet bool
-			err, bFuncRet = getFromConnectionInformation(
-				ctx,
-				r.Client,
-				log,
-				inDeploymentRef.Name,
-				inDeploymentRef.Namespace,
-				pstCRData.Name,
-				pstCRData.Namespace,
-				bAdditionalProcFlag,
-				false,
-				pstFromPodInfos,
-				-1,
-				iIOMode)
-			if nil != err {
-				bProcFlag = false
-				break
-			}
-			if !bFuncRet {
-				bProcFlag = false
-				break
+				var bFuncRet bool
+				err, bFuncRet = getFromConnectionInformation(
+					ctx,
+					r.Client,
+					log,
+					inDeploymentRef.Name,
+					inDeploymentRef.Namespace,
+					pstCRData.Name,
+					pstCRData.Namespace,
+					arInputSubsets,
+					arOutputSubsets,
+					bAdditionalProcFlag,
+					false,
+					pstFromPodInfos,
+					-1,
+					examplecomv1.IOModeIN)
+				if err != nil {
+					bProcFlag = false
+					break
+				}
+				if !bFuncRet {
+					bProcFlag = false
+					break
+				}
 			}
 		}
 	}
@@ -914,7 +1575,6 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationshipOutput(
 	pstCRData *examplecomv1.DCIAppConnection,
 	bAdditionalProcFlag bool,
 	pstFromPodInfos *examplecomv1.FromPodInfos) (error, bool) {
-
 	var err error
 	bProcFlag := true
 
@@ -922,57 +1582,86 @@ func (r *DCIAppConnectionReconciler) getConnectionRelationshipOutput(
 	log.Info(cFuncName + " Start." +
 		" bAdditionalProcFlag: " + strconv.FormatBool(bAdditionalProcFlag))
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
-		var inDeploymentRef examplecomv1.NamespaceName
-		if pstCRData.Spec.InputEndpoint != nil {
-			inDeploymentRef =
-				pstCRData.Spec.InputEndpoint.Internal.DeploymentRef
-		}
-		outDeploymentRef :=
-			pstCRData.Spec.OutputEndpoint.Internal.DeploymentRef
-
-		// OutputEndpoint Relation
-		if inDeploymentRef.Name == outDeploymentRef.Name &&
-			inDeploymentRef.Namespace == outDeploymentRef.Namespace {
-			break
+	for range 1 {
+		arOutputEndpoints := pstCRData.Spec.OutputEndpoints
+		if !bAdditionalProcFlag {
+			arOutputEndpoints = pstCRData.Status.OutputEndpoints
 		}
 
-		bFromExistFlag := false
+		for iOutIdx := range arOutputEndpoints {
+			outDeploymentRef :=
+				arOutputEndpoints[iOutIdx].Internal.DeploymentRef
 
-		for iConnIdx := 0; len(pstCRData.Spec.Connections) > iConnIdx; iConnIdx++ {
-			pstConnection := pstCRData.Spec.Connections[iConnIdx]
-			if outDeploymentRef.Name ==
-				pstConnection.From.DeploymentRef.Name &&
-				outDeploymentRef.Namespace ==
-					pstConnection.From.DeploymentRef.Namespace {
-
-				bFromExistFlag = true
-				break
+			bFromExistFlag := false
+			for iFromPodIdx := range len(pstFromPodInfos.FromPods) {
+				stFromPod := pstFromPodInfos.FromPods[iFromPodIdx]
+				if outDeploymentRef.Name == stFromPod.DeploymentRef.Name &&
+					outDeploymentRef.Namespace == stFromPod.DeploymentRef.Namespace {
+					bFromExistFlag = true
+					arOutputSubsets := stFromPod.OutputSubsets
+					for iSubIdx := range len(arOutputEndpoints[iOutIdx].ExternalSubsets) {
+						var iFromSubIdx int
+						for iFromSubIdx = 0; len(arOutputSubsets) > iFromSubIdx; iFromSubIdx++ {
+							if arOutputEndpoints[iOutIdx].ExternalSubsets[iSubIdx] ==
+								arOutputSubsets[iFromSubIdx] {
+								break
+							}
+						}
+						if len(arOutputSubsets) == iFromSubIdx {
+							arOutputSubsets = append(arOutputSubsets,
+								arOutputEndpoints[iOutIdx].ExternalSubsets[iSubIdx])
+						}
+					}
+					pstFromPodInfos.FromPods[iFromPodIdx].OutputSubsets = arOutputSubsets
+					pstFromPodInfos.FromPods[iFromPodIdx].IOMode |= examplecomv1.IOModeOUT
+					log.Info(cFuncName + " set the OutputSubsets Info in the FromPod." +
+						" OutputSubsets len: " +
+						strconv.Itoa(len(pstFromPodInfos.FromPods[iFromPodIdx].OutputSubsets)) +
+						", Name: " + outDeploymentRef.Name)
+				}
 			}
-		}
-		if !bFromExistFlag {
-			var bFuncRet bool
-			err, bFuncRet = getFromConnectionInformation(
-				ctx,
-				r.Client,
-				log,
-				outDeploymentRef.Name,
-				outDeploymentRef.Namespace,
-				pstCRData.Name,
-				pstCRData.Namespace,
-				bAdditionalProcFlag,
-				false,
-				pstFromPodInfos,
-				-1,
-				examplecomv1.IOModeOUT)
-			if nil != err {
-				bProcFlag = false
-				break
-			}
-			if !bFuncRet {
-				bProcFlag = false
-				break
+
+			if !bFromExistFlag {
+				var arOutputSubsets []string
+				for iSubIdx := range len(arOutputEndpoints[iOutIdx].ExternalSubsets) {
+					var iFromSubIdx int
+					for iFromSubIdx = 0; len(arOutputSubsets) > iFromSubIdx; iFromSubIdx++ {
+						if arOutputEndpoints[iOutIdx].ExternalSubsets[iSubIdx] ==
+							arOutputSubsets[iFromSubIdx] {
+							break
+						}
+					}
+					if len(arOutputSubsets) == iFromSubIdx {
+						arOutputSubsets = append(arOutputSubsets,
+							arOutputEndpoints[iOutIdx].ExternalSubsets[iSubIdx])
+					}
+				}
+				var arInputSubsets []string
+
+				var bFuncRet bool
+				err, bFuncRet = getFromConnectionInformation(
+					ctx,
+					r.Client,
+					log,
+					outDeploymentRef.Name,
+					outDeploymentRef.Namespace,
+					pstCRData.Name,
+					pstCRData.Namespace,
+					arInputSubsets,
+					arOutputSubsets,
+					bAdditionalProcFlag,
+					false,
+					pstFromPodInfos,
+					-1,
+					examplecomv1.IOModeOUT)
+				if err != nil {
+					bProcFlag = false
+					break
+				}
+				if !bFuncRet {
+					bProcFlag = false
+					break
+				}
 			}
 		}
 	}
@@ -990,37 +1679,20 @@ func (r *DCIAppConnectionReconciler) registDciService(
 	iConnIdx int,
 	pstToPodInfos *examplecomv1.ToPodInfos,
 	pServices, pEndpointSlices *[]types.NamespacedName) error {
-
 	var err error
 
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start." +
 		" iConnIdx: " + strconv.Itoa(iConnIdx))
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
-
+	for range 1 {
 		stToPodInfo := pstToPodInfos.ToPodInfos[iConnIdx]
 		cServiceName := stToPodInfo.DeploymentRef.Name
 		cServiceNamespace := pstCRData.Namespace
 
-		if 0 < iConnIdx {
-			var iPrevIdx int
-			for iPrevIdx = 0; iConnIdx > iPrevIdx; iPrevIdx++ {
-				stToPodInfo, exist := pstToPodInfos.ToPodInfos[iPrevIdx]
-				if exist {
-					if stToPodInfo.DeploymentRef.Name == cServiceName {
-						break
-					}
-				}
-			}
-			if iConnIdx > iPrevIdx {
-				break
-			}
-		}
-
 		b2ndNicFlag := false
 		for _, stToPod := range stToPodInfo.ToPods {
-			if len(stToPod.Address) != 0 {
+			if stToPod.Address != "" {
 				b2ndNicFlag = true
 			}
 		}
@@ -1043,7 +1715,7 @@ func (r *DCIAppConnectionReconciler) registDciService(
 			// Create Service Resource
 			var i32Port int32 = 80
 			pstCRService.Spec = corev1.ServiceSpec{
-				ClusterIP: "None",
+				ClusterIP: StringNone,
 				Ports: []corev1.ServicePort{
 					{
 						Port: i32Port,
@@ -1099,7 +1771,7 @@ func (r *DCIAppConnectionReconciler) registDciService(
 						Name:      cServiceName,
 						Namespace: cServiceNamespace,
 						Labels: map[string]string{
-							"kubernetes.io/service-name": cServiceName,
+							ServiceKey: cServiceName,
 						},
 					},
 				}
@@ -1112,11 +1784,11 @@ func (r *DCIAppConnectionReconciler) registDciService(
 			if exists {
 				pstCREndpointSlice.AddressType = discoveryv1.AddressTypeIPv4
 
-				for iPodIdx := 0; len(stToPodInfo.ToPods) > iPodIdx; iPodIdx++ {
+				for iPodIdx := range len(stToPodInfo.ToPods) {
 					if stToPodInfo.ToPods[iPodIdx].DeleteFlag {
 						continue
 					}
-					if len(stToPodInfo.ToPods[iPodIdx].Address) == 0 {
+					if stToPodInfo.ToPods[iPodIdx].Address == "" {
 						continue
 					}
 
@@ -1134,7 +1806,7 @@ func (r *DCIAppConnectionReconciler) registDciService(
 				pstCRService,
 				pstCREndpointSlice,
 				r.Scheme)
-			if nil != err {
+			if err != nil {
 				log.Error(err,
 					cFuncName+" failed to set OwnerReference for EndpointSlice resource."+
 						" Name: "+pstCREndpointSlice.Name+
@@ -1178,12 +1850,79 @@ func (r *DCIAppConnectionReconciler) registDciService(
 	return err
 }
 
+func (r *DCIAppConnectionReconciler) deleteDciService(
+	ctx context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	iConnIdx int,
+	pstToDeploymentInfos *examplecomv1.ToDeploymentInfos) {
+	var err error
+
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start." +
+		" iConnIdx: " + strconv.Itoa(iConnIdx))
+
+	for range 1 {
+		stToDeploymentInfo := pstToDeploymentInfos.ToDeploymentInfos[iConnIdx]
+		cServiceName := stToDeploymentInfo.DeploymentRef.Name
+		cServiceNamespace := pstCRData.Namespace
+
+		bAdditionalProcFlag := false
+		bPodControllerFlag := false
+		var pstCRService *corev1.Service
+		_, pstCRService, _, err = getToConnectionInformationService(
+			ctx,
+			r.Client,
+			log,
+			cServiceName,
+			cServiceNamespace,
+			pstCRData.Name,
+			pstCRData.Namespace,
+			bAdditionalProcFlag,
+			bPodControllerFlag)
+		if err != nil {
+			break
+		}
+		if pstCRService == nil {
+			break
+		}
+		if !pstCRService.DeletionTimestamp.IsZero() {
+			break
+		}
+
+		var iOwnerIdx int
+		for iOwnerIdx = 0; len(pstCRService.OwnerReferences) > iOwnerIdx; iOwnerIdx++ {
+			if pstCRService.OwnerReferences[iOwnerIdx].Name == pstCRData.Name {
+				break
+			}
+		}
+		if len(pstCRService.OwnerReferences) == iOwnerIdx {
+			log.Info(cFuncName + " Service not authorized as an owner." +
+				" Name: " + pstCRService.Name +
+				", Namespace: " + pstCRService.Namespace)
+			break
+		}
+
+		err = r.Delete(ctx, pstCRService)
+		if err != nil {
+			log.Error(err, cFuncName+" failed to delete Service resource."+
+				" Name: "+pstCRService.Name+
+				", Namespace: "+pstCRService.Namespace)
+			break
+		}
+		log.Info(cFuncName + " deleted Service resource successfully." +
+			" Name: " + pstCRService.Name +
+			", Namespace: " + pstCRService.Namespace)
+	}
+
+	log.Info(cFuncName + " End.")
+}
+
 func (r *DCIAppConnectionReconciler) createRollBack(
 	ctx context.Context,
 	log logr.Logger,
 	labelsKey, cFinalizerName string,
 	sDeployments, sPods, sServices, sEndpointSlices, sConnectEndpoints []types.NamespacedName) {
-
 	cFuncName := getFuncName()
 	log.Info(cFuncName + " Start.")
 
@@ -1191,7 +1930,7 @@ func (r *DCIAppConnectionReconciler) createRollBack(
 	stEndpointSlice := discoveryv1.EndpointSlice{}
 	stService := corev1.Service{}
 
-	for doWhile := 0; doWhile < 1; doWhile++ { //nolint:staticcheck // SA4008: This loop is intentionally only a one-time loop
+	for range 1 {
 		// RollBack ConnectEndpoint
 		for _, cep := range sConnectEndpoints {
 			err := r.Get(ctx, cep, &stConnendpoint)
@@ -1248,7 +1987,6 @@ func (r *DCIAppConnectionReconciler) createRollBack(
 					labelsKey,
 					cFinalizerName,
 					&stCRDeployment)
-
 			}
 		}
 
@@ -1295,5 +2033,430 @@ func (r *DCIAppConnectionReconciler) createRollBack(
 		}
 	}
 	log.Info(cFuncName + " End.")
-	return
+}
+
+func (r *DCIAppConnectionReconciler) updateRollBack(
+	ctx context.Context,
+	log logr.Logger,
+	sUpdateConnectEndpointCRs []*examplecomv1.ConnectEndpoint) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	pstCRConnectEndpoint := &examplecomv1.ConnectEndpoint{}
+
+	for range 1 {
+		// RollBack ConnectEndpoint
+		for _, cep := range sUpdateConnectEndpointCRs {
+			err := r.Get(ctx,
+				client.ObjectKey{
+					Name:      cep.Name,
+					Namespace: cep.Namespace,
+				}, pstCRConnectEndpoint)
+			if err != nil {
+				log.Error(err, cFuncName+" failed to get ConnectEndpointCR."+
+					" Name: "+cep.Name+
+					", Namespace: "+cep.Namespace)
+			} else {
+				pstBaseCRConnectEndpoint := client.MergeFrom(
+					pstCRConnectEndpoint.DeepCopy())
+				pstCRConnectEndpoint.Spec.InputEndpoint = cep.Spec.InputEndpoint
+				pstCRConnectEndpoint.Spec.OutputEndpoint = cep.Spec.OutputEndpoint
+				pstCRConnectEndpoint.Spec.To = cep.Spec.To
+
+				err = r.Patch(ctx, pstCRConnectEndpoint, pstBaseCRConnectEndpoint)
+				if err != nil {
+					log.Error(err, cFuncName+
+						" failed to patch ConnectEndpointCR, and the rollback could not be completed."+
+						" Name: "+cep.Name+
+						", Namespace: "+cep.Namespace)
+				} else {
+					log.Info(cFuncName + " rollback patched ConnectEndpointCR successfully." +
+						" Name: " + cep.Name +
+						", Namespace: " + cep.Namespace)
+				}
+			}
+		}
+	}
+	log.Info(cFuncName + " End.")
+}
+
+func chkConnectionRelation(
+	_ context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection) bool {
+	bProcFlag := false
+
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+	var bFuncRet bool
+
+	for range 1 {
+		bFuncRet = chkConnectionRelationship(
+			log,
+			pstCRData)
+
+		if bFuncRet {
+			bFuncRet = chkConnectionRelationshipInput(
+				log,
+				pstCRData)
+		}
+
+		if bFuncRet {
+			bFuncRet = chkConnectionRelationshipOutput(
+				log,
+				pstCRData)
+		}
+
+		if bFuncRet {
+			bProcFlag = true
+		}
+	}
+
+	log.Info(cFuncName + " End." +
+		" bProcFlag: " + strconv.FormatBool(bProcFlag))
+	return bProcFlag
+}
+
+func chkConnectionRelationship(
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection) bool {
+	bProcFlag := true
+
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	for range 1 {
+		// Connections Relation
+		if len(pstCRData.Spec.Connections) != len(pstCRData.Status.Connections) {
+			bProcFlag = false
+			break
+		}
+		for iConnIdx := range len(pstCRData.Spec.Connections) {
+			if pstCRData.Spec.Connections[iConnIdx].From.DeploymentRef !=
+				pstCRData.Status.Connections[iConnIdx].From.DeploymentRef {
+				bProcFlag = false
+				break
+			}
+			if pstCRData.Spec.Connections[iConnIdx].To.DeploymentRef !=
+				pstCRData.Status.Connections[iConnIdx].To.DeploymentRef {
+				bProcFlag = false
+				break
+			}
+		}
+	}
+
+	log.Info(cFuncName + " End." +
+		" bProcFlag: " + strconv.FormatBool(bProcFlag))
+	return bProcFlag
+}
+
+func chkConnectionRelationshipInput(
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection) bool {
+	bProcFlag := true
+
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	for range 1 {
+		// InputEndpoint Relation
+		if len(pstCRData.Spec.InputEndpoints) != len(pstCRData.Status.InputEndpoints) {
+			bProcFlag = false
+			break
+		}
+		for iInIdx := range len(pstCRData.Spec.InputEndpoints) {
+			if pstCRData.Spec.InputEndpoints[iInIdx].Internal.DeploymentRef !=
+				pstCRData.Status.InputEndpoints[iInIdx].Internal.DeploymentRef {
+				bProcFlag = false
+				break
+			}
+			if !slices.Equal(pstCRData.Spec.InputEndpoints[iInIdx].ExternalSubsets,
+				pstCRData.Status.InputEndpoints[iInIdx].ExternalSubsets) {
+				bProcFlag = false
+				break
+			}
+		}
+	}
+
+	log.Info(cFuncName + " End." +
+		" bProcFlag: " + strconv.FormatBool(bProcFlag))
+	return bProcFlag
+}
+
+func chkConnectionRelationshipOutput(
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection) bool {
+	bProcFlag := true
+
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	for range 1 {
+		// OutputEndpoints Relation
+		if len(pstCRData.Spec.OutputEndpoints) != len(pstCRData.Status.OutputEndpoints) {
+			bProcFlag = false
+			break
+		}
+		for iOutIdx := range len(pstCRData.Spec.OutputEndpoints) {
+			if pstCRData.Spec.OutputEndpoints[iOutIdx].Internal.DeploymentRef !=
+				pstCRData.Status.OutputEndpoints[iOutIdx].Internal.DeploymentRef {
+				bProcFlag = false
+				break
+			}
+			if !slices.Equal(pstCRData.Spec.OutputEndpoints[iOutIdx].ExternalSubsets,
+				pstCRData.Status.OutputEndpoints[iOutIdx].ExternalSubsets) {
+				bProcFlag = false
+				break
+			}
+		}
+	}
+
+	log.Info(cFuncName + " End." +
+		" bProcFlag: " + strconv.FormatBool(bProcFlag))
+	return bProcFlag
+}
+
+func getStatusRelation(
+	_ context.Context,
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	pstFromDeploymentInfos *examplecomv1.FromDeploymentInfos,
+	pstToDeploymentInfos *examplecomv1.ToDeploymentInfos) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	getStatusRelationship(
+		log,
+		pstCRData,
+		pstFromDeploymentInfos,
+		pstToDeploymentInfos)
+
+	getStatusRelationshipInput(
+		log,
+		pstCRData,
+		pstFromDeploymentInfos)
+
+	getStatusRelationshipOutput(
+		log,
+		pstCRData,
+		pstFromDeploymentInfos)
+
+	log.Info(cFuncName + " End.")
+}
+
+func getStatusRelationship(
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	pstFromDeploymentInfos *examplecomv1.FromDeploymentInfos,
+	pstToDeploymentInfos *examplecomv1.ToDeploymentInfos) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	arConnections := pstCRData.Status.Connections
+
+	// Connections Relation
+	for iConnIdx := range arConnections {
+		pstConnection := arConnections[iConnIdx]
+		bDupFlag := false
+
+		for iFromDeploymentIdx := range len(pstFromDeploymentInfos.FromDeployments) {
+			stFromDeployment := pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx]
+
+			if stFromDeployment.DeploymentRef.Name == pstConnection.From.DeploymentRef.Name &&
+				stFromDeployment.DeploymentRef.Namespace == pstConnection.From.DeploymentRef.Namespace {
+				stFromDeployment.DeploymentIndexs = append(
+					stFromDeployment.DeploymentIndexs,
+					iConnIdx)
+
+				pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx] = stFromDeployment
+				bDupFlag = true
+				log.Info(cFuncName + " set the DeploymentIndexs Info in the FromDeployment." +
+					" DeploymentIndexs len: " +
+					strconv.Itoa(len(pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx].DeploymentIndexs)) +
+					", Name: " + pstConnection.From.DeploymentRef.Name)
+			}
+		}
+
+		if !bDupFlag {
+			log.Info(cFuncName + " set FromDeployment Info." +
+				" Index: " + strconv.Itoa(iConnIdx) +
+				", Name: " + pstConnection.From.DeploymentRef.Name)
+
+			iIOMode := examplecomv1.IOModeNONE
+
+			var stFromDeployment examplecomv1.FromDeploymentInfo
+			stFromDeployment.DeploymentRef.Name = pstConnection.From.DeploymentRef.Name
+			stFromDeployment.DeploymentRef.Namespace = pstConnection.From.DeploymentRef.Namespace
+			stFromDeployment.IOMode = iIOMode
+			stFromDeployment.DeleteFlag = true
+			stFromDeployment.DeploymentIndexs = append(
+				stFromDeployment.DeploymentIndexs,
+				iConnIdx)
+			pstFromDeploymentInfos.FromDeployments = append(
+				pstFromDeploymentInfos.FromDeployments,
+				stFromDeployment)
+		}
+
+		log.Info(cFuncName + " set ToDeployment Info. Name: " + pstConnection.To.DeploymentRef.Name)
+		stToDeployments := pstToDeploymentInfos.ToDeploymentInfos[iConnIdx]
+		stToDeployments.DeploymentRef.Name = pstConnection.To.DeploymentRef.Name
+		stToDeployments.DeploymentRef.Namespace = pstConnection.To.DeploymentRef.Namespace
+		stToDeployments.DeleteFlag = true
+		pstToDeploymentInfos.ToDeploymentInfos[iConnIdx] = stToDeployments
+	}
+
+	log.Info(cFuncName + " End.")
+}
+
+func getStatusRelationshipInput(
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	pstFromDeploymentInfos *examplecomv1.FromDeploymentInfos) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	arInputEndpoints := pstCRData.Status.InputEndpoints
+
+	for iInIdx := range arInputEndpoints {
+		inDeploymentRef :=
+			arInputEndpoints[iInIdx].Internal.DeploymentRef
+
+		bConnExistFlag := false
+		for iFromDeploymentIdx := range len(pstFromDeploymentInfos.FromDeployments) {
+			stFromDeployment := pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx]
+			if inDeploymentRef.Name == stFromDeployment.DeploymentRef.Name &&
+				inDeploymentRef.Namespace == stFromDeployment.DeploymentRef.Namespace {
+				bConnExistFlag = true
+				arInputSubsets := stFromDeployment.InputSubsets
+				for iSubIdx := range len(arInputEndpoints[iInIdx].ExternalSubsets) {
+					var iFromSubIdx int
+					for iFromSubIdx = 0; len(arInputSubsets) > iFromSubIdx; iFromSubIdx++ {
+						if arInputEndpoints[iInIdx].ExternalSubsets[iSubIdx] ==
+							arInputSubsets[iFromSubIdx] {
+							break
+						}
+					}
+					if len(arInputSubsets) == iFromSubIdx {
+						arInputSubsets = append(arInputSubsets,
+							arInputEndpoints[iInIdx].ExternalSubsets[iSubIdx])
+					}
+				}
+				pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx].InputSubsets = arInputSubsets
+				pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx].IOMode |= examplecomv1.IOModeIN
+				log.Info(cFuncName + " set the InputSubsets Info in the FromDeployment." +
+					" InputSubsets len: " +
+					strconv.Itoa(len(pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx].InputSubsets)) +
+					", Name: " + inDeploymentRef.Name)
+			}
+		}
+
+		if !bConnExistFlag {
+			log.Info(cFuncName + " set FromDeployment Info." +
+				" Index: " + strconv.Itoa(iInIdx) +
+				", Name: " + inDeploymentRef.Name)
+
+			var arInputSubsets []string
+			for iSubIdx := range len(arInputEndpoints[iInIdx].ExternalSubsets) {
+				var iFromSubIdx int
+				for iFromSubIdx = 0; len(arInputSubsets) > iFromSubIdx; iFromSubIdx++ {
+					if arInputEndpoints[iInIdx].ExternalSubsets[iSubIdx] ==
+						arInputSubsets[iFromSubIdx] {
+						break
+					}
+				}
+				if len(arInputSubsets) == iFromSubIdx {
+					arInputSubsets = append(arInputSubsets,
+						arInputEndpoints[iInIdx].ExternalSubsets[iSubIdx])
+				}
+			}
+
+			var stFromDeployment examplecomv1.FromDeploymentInfo
+			stFromDeployment.DeploymentRef.Name = inDeploymentRef.Name
+			stFromDeployment.DeploymentRef.Namespace = inDeploymentRef.Namespace
+			stFromDeployment.InputSubsets = arInputSubsets
+			stFromDeployment.IOMode = examplecomv1.IOModeIN
+			stFromDeployment.DeleteFlag = true
+			pstFromDeploymentInfos.FromDeployments = append(
+				pstFromDeploymentInfos.FromDeployments,
+				stFromDeployment)
+		}
+	}
+
+	log.Info(cFuncName + " End.")
+}
+
+func getStatusRelationshipOutput(
+	log logr.Logger,
+	pstCRData *examplecomv1.DCIAppConnection,
+	pstFromDeploymentInfos *examplecomv1.FromDeploymentInfos) {
+	cFuncName := getFuncName()
+	log.Info(cFuncName + " Start.")
+
+	arOutputEndpoints := pstCRData.Status.OutputEndpoints
+
+	for iOutIdx := range arOutputEndpoints {
+		outDeploymentRef :=
+			arOutputEndpoints[iOutIdx].Internal.DeploymentRef
+
+		bFromExistFlag := false
+		for iFromDeploymentIdx := range len(pstFromDeploymentInfos.FromDeployments) {
+			stFromDeployment := pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx]
+			if outDeploymentRef.Name == stFromDeployment.DeploymentRef.Name &&
+				outDeploymentRef.Namespace == stFromDeployment.DeploymentRef.Namespace {
+				bFromExistFlag = true
+				arOutputSubsets := stFromDeployment.OutputSubsets
+				for iSubIdx := range len(arOutputEndpoints[iOutIdx].ExternalSubsets) {
+					var iFromSubIdx int
+					for iFromSubIdx = 0; len(arOutputSubsets) > iFromSubIdx; iFromSubIdx++ {
+						if arOutputEndpoints[iOutIdx].ExternalSubsets[iSubIdx] ==
+							arOutputSubsets[iFromSubIdx] {
+							break
+						}
+					}
+					if len(arOutputSubsets) == iFromSubIdx {
+						arOutputSubsets = append(arOutputSubsets,
+							arOutputEndpoints[iOutIdx].ExternalSubsets[iSubIdx])
+					}
+				}
+				pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx].OutputSubsets = arOutputSubsets
+				pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx].IOMode |= examplecomv1.IOModeOUT
+				log.Info(cFuncName + " set the OutputSubsets Info in the FromDeployment." +
+					" OutputSubsets len: " +
+					strconv.Itoa(len(pstFromDeploymentInfos.FromDeployments[iFromDeploymentIdx].OutputSubsets)) +
+					", Name: " + outDeploymentRef.Name)
+			}
+		}
+
+		if !bFromExistFlag {
+			log.Info(cFuncName + " set FromDeployment Info." +
+				" Index: " + strconv.Itoa(iOutIdx) +
+				", Name: " + outDeploymentRef.Name)
+
+			var arOutputSubsets []string
+			for iSubIdx := range len(arOutputEndpoints[iOutIdx].ExternalSubsets) {
+				var iFromSubIdx int
+				for iFromSubIdx = 0; len(arOutputSubsets) > iFromSubIdx; iFromSubIdx++ {
+					if arOutputEndpoints[iOutIdx].ExternalSubsets[iSubIdx] ==
+						arOutputSubsets[iFromSubIdx] {
+						break
+					}
+				}
+				if len(arOutputSubsets) == iFromSubIdx {
+					arOutputSubsets = append(arOutputSubsets,
+						arOutputEndpoints[iOutIdx].ExternalSubsets[iSubIdx])
+				}
+			}
+			var stFromDeployment examplecomv1.FromDeploymentInfo
+			stFromDeployment.DeploymentRef.Name = outDeploymentRef.Name
+			stFromDeployment.DeploymentRef.Namespace = outDeploymentRef.Namespace
+			stFromDeployment.OutputSubsets = arOutputSubsets
+			stFromDeployment.IOMode = examplecomv1.IOModeOUT
+			stFromDeployment.DeleteFlag = true
+			pstFromDeploymentInfos.FromDeployments = append(
+				pstFromDeploymentInfos.FromDeployments,
+				stFromDeployment)
+		}
+	}
+
+	log.Info(cFuncName + " End.")
 }

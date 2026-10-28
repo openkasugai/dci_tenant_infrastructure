@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package utils
 
 import (
@@ -20,6 +6,7 @@ import (
 	"math/rand"
 	"slices"
 
+	resourcev1 "k8s.io/api/resource/v1beta2"
 	capiv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	capdv1 "cluster-api-provider-dci/api/v1beta2"
@@ -350,4 +337,19 @@ func convertGPUSpecToUUIDs(
 		uuids = append(uuids, assignment.UUID)
 	}
 	return uuids
+}
+
+// IsSameDeviceTaintSelector is a function to check if the DeviceTaintSelector is the same as the given spec.
+func IsSameDeviceTaintSelector(
+	s1, s2 *resourcev1.DeviceTaintSelector,
+) (isSame bool) {
+	if s1 == nil && s2 == nil {
+		return true
+	}
+	if s1 == nil || s2 == nil {
+		return false
+	}
+	return isSameSpec(s1.Driver, s2.Driver) &&
+		isSameSpec(s1.Pool, s2.Pool) &&
+		isSameSpec(s1.Device, s2.Device)
 }

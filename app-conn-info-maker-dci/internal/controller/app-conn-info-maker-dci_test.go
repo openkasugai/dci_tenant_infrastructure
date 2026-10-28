@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -90,6 +76,7 @@ var cPod01NameToA1 string = "testdeployment01to-a-1-1"
 var cPod01NameToA2 string = "testdeployment01to-a-1-2"
 var cPod01NameTo2A string = "testdeployment01to-a-2-1"
 var cPod01NameToC1 string = "testdeployment01to-c-1-1"
+var cPod01NameToC2 string = "testdeployment01to-c-1-2"
 var cPod01NameToY1 string = "testdeployment01to-y-1-1"
 var cPod01NameToY2 string = "testdeployment01to-y-1-2"
 var cService01NameToA string = cDeployment01NameToA
@@ -110,6 +97,7 @@ var cPod01IpAddressToA1 string = "10.10.10.11"
 var cPod01IpAddressToA2 string = "10.10.10.12"
 var cPod01IpAddressTo2A string = "10.10.10.112"
 var cPod01IpAddressToC1 string = "10.10.11.11"
+var cPod01IpAddressToC2 string = "10.10.11.12"
 var cPod01IpAddressToY1 string = "10.10.12.11"
 var cPod01IpAddressToY2 string = "10.10.12.12"
 var cPodIfName string = "net1"
@@ -140,28 +128,54 @@ var HostDeviceNetwork01 = hostdevicenetwork.HostDeviceNetwork{
 }
 
 // DCIAppConnection
-var DCIAppConnection01InputEndpoint = examplecomv1.DCIAppConnectionExternalEndpoint{
-	Internal: examplecomv1.TargetRef{
-		DeploymentRef: examplecomv1.NamespaceName{
-			Name:      cDeployment01NameFromX,
-			Namespace: cDeploymentNamespace,
+var DCIAppConnection01InputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
 		},
-	},
-	ExternalSubsets: []string{
-		"rtsp://localhost:8554",
-		"rtsp://localhost:8555",
+		ExternalSubsets: []string{
+			"rtsp://localhost:8554",
+			"rtsp://localhost:8555",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8556",
+			"rtsp://localhost:8557",
+		},
 	},
 }
-var DCIAppConnection01OutputEndpoint = examplecomv1.DCIAppConnectionExternalEndpoint{
-	Internal: examplecomv1.TargetRef{
-		DeploymentRef: examplecomv1.NamespaceName{
-			Name:      cDeployment01NameToY,
-			Namespace: cDeploymentNamespace,
+var DCIAppConnection01OutputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
 		},
-	},
-	ExternalSubsets: []string{
-		"https://localhost:8600",
-		"https://localhost:8601",
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8601",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8602",
+			"https://localhost:8603",
+		},
 	},
 }
 
@@ -217,13 +231,16 @@ var DCIAppConnection01 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnection01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
 	},
 }
 
 var DCIAppConnection01Status = examplecomv1.DCIAppConnectionStatus{
-	Phase: "Created",
+	Phase:           "Created",
+	Connections:     DCIAppConnection01.Spec.Connections,
+	InputEndpoints:  DCIAppConnection01.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection01.Spec.OutputEndpoints,
 }
 
 // DCIAppConnection Test05 Change the definition order with X-Y at the top
@@ -279,8 +296,8 @@ var DCIAppConnection01topToY = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnection01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
 	},
 }
 
@@ -336,22 +353,32 @@ var DCIAppConnectionE01 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnection01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
 	},
 }
-var DCIAppConnectionCE01OutputEndpoint = examplecomv1.DCIAppConnectionExternalEndpoint{
-	Internal: examplecomv1.TargetRef{
-		DeploymentRef: examplecomv1.NamespaceName{
-			Name:      cDeployment01NameToX,
-			Namespace: cDeploymentNamespace,
+var DCIAppConnectionCE01OutputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8601",
 		},
 	},
+}
+
+var ConnectEndpointCE01OutputEndpoint = examplecomv1.ExternalEndpoint{
 	ExternalSubsets: []string{
 		"https://localhost:8600",
 		"https://localhost:8601",
 	},
 }
+
 var DCIAppConnectionCE01 = examplecomv1.DCIAppConnection{
 	TypeMeta: metav1.TypeMeta{
 		APIVersion: cDCIAppConnectionAPIVersion,
@@ -417,22 +444,32 @@ var DCIAppConnectionCE01 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnectionCE01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnectionCE01OutputEndpoints,
 	},
 }
-var DCIAppConnectionCE02OutputEndpoint = examplecomv1.DCIAppConnectionExternalEndpoint{
-	Internal: examplecomv1.TargetRef{
-		DeploymentRef: examplecomv1.NamespaceName{
-			Name:      cDeployment01NameToX,
-			Namespace: cDeploymentNamespace,
+var DCIAppConnectionCE02OutputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8554",
+			"rtsp://localhost:8555",
 		},
 	},
+}
+
+var ConnectEndpointCE02OutputEndpoint = examplecomv1.ExternalEndpoint{
 	ExternalSubsets: []string{
-		"https://localhost:8554",
-		"https://localhost:8555",
+		"rtsp://localhost:8554",
+		"rtsp://localhost:8555",
 	},
 }
+
 var DCIAppConnectionCE02 = examplecomv1.DCIAppConnection{
 	TypeMeta: metav1.TypeMeta{
 		APIVersion: cDCIAppConnectionAPIVersion,
@@ -498,8 +535,8 @@ var DCIAppConnectionCE02 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnectionCE02OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnectionCE02OutputEndpoints,
 	},
 }
 
@@ -751,6 +788,43 @@ var EndpointSlice01ToC = discoveryv1.EndpointSlice{
 		},
 	},
 }
+var EndpointSlice01ToC2TergetRef = corev1.ObjectReference{
+	Kind:      cPodKind,
+	Name:      cPod01NameToC2,
+	Namespace: cPodNamespace,
+}
+var EndpointSlice01ToC2Add = discoveryv1.EndpointSlice{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: cEndpointSliceAPIVersion,
+		Kind:       cEndpointSliceKind,
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      cEndpointSlice01NameToC,
+		Namespace: cEndpointSliceNamespace,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: cServiceAPIVersion,
+				Kind:       cServiceKind,
+				Name:       cService01NameToC,
+				UID:        "0",
+			},
+		},
+	},
+	AddressType: discoveryv1.AddressTypeIPv4,
+	Endpoints: []discoveryv1.Endpoint{
+		{
+			Addresses: []string{
+				cPod01IpAddressToC1,
+			},
+			TargetRef: &EndpointSlice01ToC1TergetRef,
+		}, {
+			Addresses: []string{
+				cPod01IpAddressToC2,
+			},
+			TargetRef: &EndpointSlice01ToC2TergetRef,
+		},
+	},
+}
 var EndpointSlice01ToYLabels = map[string]string{
 	"kubernetes.io/service-name": cService01NameToY,
 }
@@ -861,6 +935,8 @@ var ConnectEndpoint01FromX1SpecInputEndpoint = examplecomv1.ExternalEndpoint{
 	ExternalSubsets: []string{
 		"rtsp://localhost:8554",
 		"rtsp://localhost:8555",
+		"rtsp://localhost:8556",
+		"rtsp://localhost:8557",
 	},
 }
 
@@ -868,6 +944,8 @@ var ConnectEndpoint01ToY1SpecOutputEndpoint = examplecomv1.ExternalEndpoint{
 	ExternalSubsets: []string{
 		"https://localhost:8600",
 		"https://localhost:8601",
+		"https://localhost:8602",
+		"https://localhost:8603",
 	},
 }
 
@@ -1903,6 +1981,7 @@ var Deployment01ToALabelsNoneNamespace = map[string]string{
 	cDCIAppConnectionKind:    cDCIAppConnection01Name,
 }
 var iReplicas01ToC int32 = 1
+var iReplicas01ToC1to2 int32 = 2
 var stDeploymentSelector01ToC = metav1.LabelSelector{
 	MatchLabels: map[string]string{
 		"app":                    "nginx",
@@ -2356,8 +2435,11 @@ var ReplicaSet01ToY0 = appsv1.ReplicaSet{
 }
 
 // Pod
-var PodStatusRunning = corev1.PodStatus{
-	Phase: corev1.PodRunning,
+var PodStatusReady = []corev1.PodCondition{
+	{
+		Type:   corev1.PodReady,
+		Status: corev1.ConditionTrue,
+	},
 }
 var Pod01FromXLabels = map[string]string{
 	"app":                    "nginx",
@@ -2431,7 +2513,12 @@ var Pod01FromX1 = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01FromX2 = corev1.Pod{
@@ -2467,7 +2554,12 @@ var Pod01FromX2 = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01FromX2HostDeviceNetworkNone = corev1.Pod{
@@ -2507,7 +2599,12 @@ var Pod01FromX2HostDeviceNetworkNone = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01FromX2NicNone = corev1.Pod{
@@ -2542,7 +2639,12 @@ var Pod01FromX2NicNone = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01ToALabels = map[string]string{
@@ -2620,7 +2722,12 @@ var Pod01ToA1 = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01ToA2Anno2ndNicNone = map[string]string{
@@ -2663,7 +2770,12 @@ var Pod01ToA2 = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01ToA2HostDeviceNetworkNone = corev1.Pod{
@@ -2699,7 +2811,12 @@ var Pod01ToA2HostDeviceNetworkNone = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01ToA2NicNone = corev1.Pod{
@@ -2734,7 +2851,12 @@ var Pod01ToA2NicNone = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01To2ALabels = map[string]string{
@@ -2781,7 +2903,12 @@ var Pod01To2A = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01ToCLabels = map[string]string{
@@ -2828,7 +2955,53 @@ var Pod01ToC1 = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
+	},
+}
+var Pod01ToC2 = corev1.Pod{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: cPodAPIVersion,
+		Kind:       cPodKind,
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      cPod01NameToC2,
+		Namespace: cPodNamespace,
+		Annotations: map[string]string{
+			"k8s.v1.cni.cncf.io/networks":       cHostDeviceNetwork01Name,
+			"k8s.v1.cni.cncf.io/network-status": Pod01ToC2Annotation,
+		},
+		Labels: Pod01ToCLabels0,
+		OwnerReferences: []metav1.OwnerReference{
+			{
+				APIVersion: cReplicaSetAPIVersion,
+				Kind:       cReplicaSetKind,
+				Name:       cReplicaSet01NameToC,
+				UID:        "0",
+			},
+		},
+	},
+	Spec: corev1.PodSpec{
+		Containers: []corev1.Container{
+			{
+				Name:    "nginx",
+				Image:   "nginx",
+				Command: []string{"sh", "-c"},
+				Args:    []string{"while true;do sleep 2; done"},
+			},
+		},
+	},
+	Status: corev1.PodStatus{
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01ToYLabels = map[string]string{
@@ -2847,6 +3020,12 @@ var Pod01ToYLabelsNoneNamespace = map[string]string{
 	"app.kubernetes.io/name": cDeployment01NameToY,
 	"pod-template-hash":      "1",
 	cDCIAppConnectionKind:    cDCIAppConnection01Name,
+}
+var Pod01ToYLabelsUnmatchName = map[string]string{
+	"app":                    "nginx",
+	"app.kubernetes.io/name": cDeployment01NameToY,
+	"pod-template-hash":      "1",
+	cDCIAppConnectionKind:    "testtest" + "_" + cDCIAppConnectionNamespace,
 }
 var Pod01ToY1 = corev1.Pod{
 	TypeMeta: metav1.TypeMeta{
@@ -2881,7 +3060,12 @@ var Pod01ToY1 = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 var Pod01ToY2 = corev1.Pod{
@@ -2917,7 +3101,12 @@ var Pod01ToY2 = corev1.Pod{
 		},
 	},
 	Status: corev1.PodStatus{
-		Phase: corev1.PodRunning,
+		Conditions: []corev1.PodCondition{
+			{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			},
+		},
 	},
 }
 
@@ -2993,16 +3182,19 @@ var Pod01To2AAnnotation = "[{\t\"name\": \"testeth2\", \"interface\": \"eth2\", 
 
 var Pod01ToC1Annotation = "[{	\"name\": \"testeth1\", \"interface\": \"eth1\", \"" + cPodIps + "\": [\"100.100.100.11\"], \"default\": true, \"dns\": {} },{	\"name\": \"default/macvlan-conf\", \"interface\": \"" + cPodIfName + "\", \"" + cPodIps + "\": [\"" + cPod01IpAddressToC1 + "\"], \"dns\": {} }]"
 
-//	"[{	\"name\": \"testeth1\",
+// "[{	\"name\": \"testeth1\",
+//
 //		\"interface\": \"eth1\",
 //		\"" + cPodIps + "\": [\"100.100.100.11\"],
 //		\"default\": true,
 //		\"dns\": {}
 //	},{	\"name\": \"default/macvlan-conf\",
+//
 //		\"interface\": \"" + cPodIfName + "\",
 //		\"" + cPodIps + "\": [\"" + cPod01IpAddressToC1 + "\"],
 //		\"dns\": {}
 //	}]"
+var Pod01ToC2Annotation = "[{	\"name\": \"testeth1\", \"interface\": \"eth1\", \"" + cPodIps + "\": [\"100.100.100.11\"], \"default\": true, \"dns\": {} },{	\"name\": \"default/macvlan-conf\", \"interface\": \"" + cPodIfName + "\", \"" + cPodIps + "\": [\"" + cPod01IpAddressToC2 + "\"], \"dns\": {} }]"
 
 var Pod01ToY1Annotation = "[{	\"name\": \"testeth1\", \"interface\": \"eth1\", \"" + cPodIps + "\": [\"100.100.100.11\"], \"default\": true, \"dns\": {} },{	\"name\": \"default/macvlan-conf\", \"interface\": \"" + cPodIfName + "\", \"" + cPodIps + "\": [\"" + cPod01IpAddressToY1 + "\"], \"dns\": {} }]"
 
@@ -3084,12 +3276,15 @@ var DCIAppConnection09 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnection01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
 	},
 }
 var DCIAppConnection09Status = examplecomv1.DCIAppConnectionStatus{
-	Phase: "Created",
+	Phase:           "Created",
+	Connections:     DCIAppConnection09.Spec.Connections,
+	InputEndpoints:  DCIAppConnection09.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection09.Spec.OutputEndpoints,
 }
 var ConnectEndpoint09FromX1 = examplecomv1.ConnectEndpoint{
 	TypeMeta: metav1.TypeMeta{
@@ -3213,7 +3408,7 @@ var ConnectEndpoint09ToY1 = examplecomv1.ConnectEndpoint{
 }
 
 // DCIAppConnection
-// X-A,X-Y,Y-C,in-Y,out-Y
+// X-A,X-Y,Y-C,in-X,out-Y
 var DCIAppConnection10 = examplecomv1.DCIAppConnection{
 	TypeMeta: metav1.TypeMeta{
 		APIVersion: cDCIAppConnectionAPIVersion,
@@ -3266,12 +3461,15 @@ var DCIAppConnection10 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnection01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
 	},
 }
 var DCIAppConnection10Status = examplecomv1.DCIAppConnectionStatus{
-	Phase: "Created",
+	Phase:           "Created",
+	Connections:     DCIAppConnection10.Spec.Connections,
+	InputEndpoints:  DCIAppConnection10.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection10.Spec.OutputEndpoints,
 }
 var ConnectEndpoint10FromX1 = examplecomv1.ConnectEndpoint{
 	TypeMeta: metav1.TypeMeta{
@@ -3464,12 +3662,15 @@ var DCIAppConnection15 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnection01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
 	},
 }
 var DCIAppConnection15Status = examplecomv1.DCIAppConnectionStatus{
-	Phase: "Created",
+	Phase:           "Created",
+	Connections:     DCIAppConnection15.Spec.Connections,
+	InputEndpoints:  DCIAppConnection15.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection15.Spec.OutputEndpoints,
 }
 var ConnectEndpoint15FromX1 = examplecomv1.ConnectEndpoint{
 	TypeMeta: metav1.TypeMeta{
@@ -3624,10 +3825,17 @@ var DCIAppConnection12 = examplecomv1.DCIAppConnection{
 		Namespace: cDCIAppConnectionNamespace,
 	},
 	Spec: examplecomv1.DCIAppConnectionSpec{
-		Connections:    []examplecomv1.Connection{},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnectionCE01OutputEndpoint,
+		Connections:     []examplecomv1.Connection{},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnectionCE01OutputEndpoints,
 	},
+}
+
+var DCIAppConnection12Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     nil,
+	InputEndpoints:  DCIAppConnection12.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection12.Spec.OutputEndpoints,
 }
 
 var ConnectEndpoint12FromX1 = examplecomv1.ConnectEndpoint{
@@ -3663,7 +3871,7 @@ var ConnectEndpoint12FromX1 = examplecomv1.ConnectEndpoint{
 		},
 		To:             nil,
 		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
-		OutputEndpoint: &ConnectEndpoint12ToX1SpecOutputEndpoint,
+		OutputEndpoint: &ConnectEndpointCE01OutputEndpoint,
 	},
 }
 
@@ -3695,9 +3903,16 @@ var DCIAppConnection13 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnectionCE01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnectionCE01OutputEndpoints,
 	},
+}
+
+var DCIAppConnection13Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection13.Spec.Connections,
+	InputEndpoints:  DCIAppConnection13.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection13.Spec.OutputEndpoints,
 }
 
 var ConnectEndpoint13FromX1 = examplecomv1.ConnectEndpoint{
@@ -3756,7 +3971,7 @@ var ConnectEndpoint13FromX1 = examplecomv1.ConnectEndpoint{
 			},
 		},
 		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
-		OutputEndpoint: &ConnectEndpoint12ToX1SpecOutputEndpoint,
+		OutputEndpoint: &ConnectEndpointCE01OutputEndpoint,
 	},
 }
 
@@ -3786,9 +4001,16 @@ var DCIAppConnection14 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection01InputEndpoint,
-		OutputEndpoint: &DCIAppConnection01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
 	},
+}
+
+var DCIAppConnection14Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection14.Spec.Connections,
+	InputEndpoints:  DCIAppConnection14.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection14.Spec.OutputEndpoints,
 }
 
 var ConnectEndpoint14FromX1 = examplecomv1.ConnectEndpoint{
@@ -3845,16 +4067,18 @@ var ConnectEndpoint14FromX1 = examplecomv1.ConnectEndpoint{
 
 // DCIAppConnection
 // X-A,X-Y,Y-C,in-Y,out-Y
-var DCIAppConnection11InputEndpoint = examplecomv1.DCIAppConnectionExternalEndpoint{
-	Internal: examplecomv1.TargetRef{
-		DeploymentRef: examplecomv1.NamespaceName{
-			Name:      cDeployment01NameFromY,
-			Namespace: cDeploymentNamespace,
+var DCIAppConnection11InputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromY,
+				Namespace: cDeploymentNamespace,
+			},
 		},
-	},
-	ExternalSubsets: []string{
-		"rtsp://localhost:8554",
-		"rtsp://localhost:8555",
+		ExternalSubsets: []string{
+			"rtsp://localhost:8554",
+			"rtsp://localhost:8555",
+		},
 	},
 }
 var DCIAppConnection11 = examplecomv1.DCIAppConnection{
@@ -3909,13 +4133,16 @@ var DCIAppConnection11 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint:  &DCIAppConnection11InputEndpoint,
-		OutputEndpoint: &DCIAppConnection01OutputEndpoint,
+		InputEndpoints:  DCIAppConnection11InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
 	},
 }
 
 var DCIAppConnection11Status = examplecomv1.DCIAppConnectionStatus{
-	Phase: "Created",
+	Phase:           "Created",
+	Connections:     DCIAppConnection11.Spec.Connections,
+	InputEndpoints:  DCIAppConnection11.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection11.Spec.OutputEndpoints,
 }
 
 var ConnectEndpoint11FromX1 = examplecomv1.ConnectEndpoint{
@@ -3989,6 +4216,13 @@ var ConnectEndpoint11FromX1 = examplecomv1.ConnectEndpoint{
 	},
 }
 
+var ConnectEndpoint11ToY1SpecInputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"rtsp://localhost:8554",
+		"rtsp://localhost:8555",
+	},
+}
+
 var ConnectEndpoint11ToY1 = examplecomv1.ConnectEndpoint{
 	TypeMeta: metav1.TypeMeta{
 		APIVersion: cConnectEndpointAPIVersion,
@@ -4037,7 +4271,7 @@ var ConnectEndpoint11ToY1 = examplecomv1.ConnectEndpoint{
 				},
 			},
 		},
-		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		InputEndpoint:  &ConnectEndpoint11ToY1SpecInputEndpoint,
 		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
 	},
 }
@@ -4165,7 +4399,7 @@ var ConnectEndpoint11ToY2 = examplecomv1.ConnectEndpoint{
 				},
 			},
 		}},
-		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		InputEndpoint:  &ConnectEndpoint11ToY1SpecInputEndpoint,
 		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
 	},
 }
@@ -4344,8 +4578,14 @@ var DCIAppConnection16 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		OutputEndpoint: &DCIAppConnectionCE01OutputEndpoint,
+		OutputEndpoints: DCIAppConnectionCE01OutputEndpoints,
 	},
+}
+
+var DCIAppConnection16Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection16.Spec.Connections,
+	OutputEndpoints: DCIAppConnection16.Spec.OutputEndpoints,
 }
 
 var ConnectEndpoint16FromX1 = examplecomv1.ConnectEndpoint{
@@ -4403,7 +4643,7 @@ var ConnectEndpoint16FromX1 = examplecomv1.ConnectEndpoint{
 				},
 			},
 		},
-		OutputEndpoint: &ConnectEndpoint12ToX1SpecOutputEndpoint,
+		OutputEndpoint: &ConnectEndpointCE01OutputEndpoint,
 	},
 }
 var ConnectEndpoint16FromX1NoneA2 = examplecomv1.ConnectEndpoint{
@@ -4454,7 +4694,7 @@ var ConnectEndpoint16FromX1NoneA2 = examplecomv1.ConnectEndpoint{
 				},
 			},
 		},
-		OutputEndpoint: &ConnectEndpoint12ToX1SpecOutputEndpoint,
+		OutputEndpoint: &ConnectEndpointCE01OutputEndpoint,
 	},
 }
 var ConnectEndpoint16FromX2 = examplecomv1.ConnectEndpoint{
@@ -4512,7 +4752,7 @@ var ConnectEndpoint16FromX2 = examplecomv1.ConnectEndpoint{
 				},
 			},
 		},
-		OutputEndpoint: &ConnectEndpoint12ToX1SpecOutputEndpoint,
+		OutputEndpoint: &ConnectEndpointCE01OutputEndpoint,
 	},
 }
 
@@ -4542,8 +4782,14 @@ var DCIAppConnection17 = examplecomv1.DCIAppConnection{
 				},
 			},
 		},
-		InputEndpoint: &DCIAppConnection01InputEndpoint,
+		InputEndpoints: DCIAppConnection01InputEndpoints,
 	},
+}
+
+var DCIAppConnection17Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:          "Created",
+	Connections:    DCIAppConnection17.Spec.Connections,
+	InputEndpoints: DCIAppConnection17.Spec.InputEndpoints,
 }
 
 var ConnectEndpoint17FromX1 = examplecomv1.ConnectEndpoint{
@@ -4743,6 +4989,11 @@ var DCIAppConnection18 = examplecomv1.DCIAppConnection{
 	},
 }
 
+var DCIAppConnection18Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:       "Created",
+	Connections: DCIAppConnection18.Spec.Connections,
+}
+
 var ConnectEndpoint18FromX1 = examplecomv1.ConnectEndpoint{
 	TypeMeta: metav1.TypeMeta{
 		APIVersion: cConnectEndpointAPIVersion,
@@ -4905,5 +5156,1807 @@ var ConnectEndpoint18FromX2 = examplecomv1.ConnectEndpoint{
 				},
 			},
 		},
+	},
+}
+
+var DCIAppConnection26InputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8554",
+			"rtsp://localhost:8555",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8555",
+			"rtsp://localhost:8557",
+		},
+	},
+}
+var DCIAppConnection26OutputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8601",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8603",
+		},
+	},
+}
+
+var DCIAppConnection26 = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection26InputEndpoints,
+		OutputEndpoints: DCIAppConnection26OutputEndpoints,
+	},
+}
+
+var DCIAppConnection26Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection26.Spec.Connections,
+	InputEndpoints:  DCIAppConnection26.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection26.Spec.OutputEndpoints,
+}
+
+var ConnectEndpoint26FromX1SpecInputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"rtsp://localhost:8554",
+		"rtsp://localhost:8555",
+		"rtsp://localhost:8557",
+	},
+}
+
+var ConnectEndpoint26ToY1SpecOutputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"https://localhost:8600",
+		"https://localhost:8601",
+		"https://localhost:8603",
+	},
+}
+
+var ConnectEndpoint26FromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01FromX1.Spec.From,
+		To:             ConnectEndpoint10FromX1.Spec.To,
+		InputEndpoint:  &ConnectEndpoint26FromX1SpecInputEndpoint,
+		OutputEndpoint: nil,
+	},
+}
+
+var ConnectEndpoint26ToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		To:             ConnectEndpoint10ToY1.Spec.To,
+		OutputEndpoint: &ConnectEndpoint26ToY1SpecOutputEndpoint,
+	},
+}
+
+var ConnectEndpoint26FromX2 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX2.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX2.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint01FromX2.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToA,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA1,
+					},
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA2,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA2,
+					},
+				},
+			}, {
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToY,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToY1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToY1,
+					},
+				},
+			},
+		},
+		InputEndpoint:  &ConnectEndpoint26FromX1SpecInputEndpoint,
+		OutputEndpoint: nil,
+	},
+}
+
+var ConnectEndpoint26FromX1addY2 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint01FromX1.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToA,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA1,
+					},
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA2,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA2,
+					},
+				},
+			}, {
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToY,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToY1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToY1,
+					}, {
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToY2,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToY2,
+					},
+				},
+			},
+		},
+		InputEndpoint:  &ConnectEndpoint26FromX1SpecInputEndpoint,
+		OutputEndpoint: nil,
+	},
+}
+var ConnectEndpoint26ToY1addC2 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint01ToY1.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToC,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToC1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToC1,
+					}, {
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToC2,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToC2,
+					},
+				},
+			},
+		},
+		OutputEndpoint: &ConnectEndpoint26ToY1SpecOutputEndpoint,
+	},
+}
+
+var ConnectEndpoint26ToY2 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY2.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY2.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY2.Spec.From,
+		To:             ConnectEndpoint10ToY1.Spec.To,
+		OutputEndpoint: &ConnectEndpoint26ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection27InputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8554",
+			"rtsp://localhost:8554",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8556",
+			"rtsp://localhost:8557",
+		},
+	},
+}
+var DCIAppConnection27OutputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8601",
+			"https://localhost:8601",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8602",
+			"https://localhost:8603",
+		},
+	},
+}
+var DCIAppConnection27 = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection27InputEndpoints,
+		OutputEndpoints: DCIAppConnection27OutputEndpoints,
+	},
+}
+
+var DCIAppConnection27Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection27.Spec.Connections,
+	InputEndpoints:  DCIAppConnection27.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection27.Spec.OutputEndpoints,
+}
+var ConnectEndpoint27FromX1SpecInputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"rtsp://localhost:8554",
+		"rtsp://localhost:8556",
+		"rtsp://localhost:8557",
+	},
+}
+var ConnectEndpoint27ToY1SpecOutputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"https://localhost:8601",
+		"https://localhost:8602",
+		"https://localhost:8603",
+	},
+}
+var ConnectEndpoint27FromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01FromX1.Spec.From,
+		InputEndpoint:  &ConnectEndpoint27FromX1SpecInputEndpoint,
+		OutputEndpoint: nil,
+	},
+}
+var ConnectEndpoint27ToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		OutputEndpoint: &ConnectEndpoint27ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection31Add = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection10.TypeMeta,
+	ObjectMeta: DCIAppConnection10.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     DCIAppConnection31Del.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection31AddStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection31Add.Spec.Connections,
+	InputEndpoints:  DCIAppConnection31Add.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection31Add.Spec.OutputEndpoints,
+}
+
+var DCIAppConnection31Del = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection10.TypeMeta,
+	ObjectMeta: DCIAppConnection10.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToA,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Phase:           "Created",
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection31DelStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection31Del.Spec.Connections,
+	InputEndpoints:  DCIAppConnection31Del.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection31Del.Spec.OutputEndpoints,
+}
+
+var ConnectEndpoint31AddFromX1 = ConnectEndpoint10FromX1
+var ConnectEndpoint31AddToY1 = ConnectEndpoint10ToY1
+var ConnectEndpoint31DelFromX1 = ConnectEndpoint10FromX1
+var ConnectEndpoint31DelToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint10ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint10ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint10ToY1.Spec.From,
+		To:             nil,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection32Add = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToC,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToC,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection32DelInputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection32AddStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection32Add.Spec.Connections,
+	InputEndpoints:  DCIAppConnection32Add.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection32Add.Spec.OutputEndpoints,
+}
+
+var DCIAppConnection32DelInputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8554",
+			"rtsp://localhost:8555",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8556",
+			"rtsp://localhost:8557",
+		},
+	},
+}
+
+var DCIAppConnection32Del = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection32Add.Status.Connections,
+		InputEndpoints:  DCIAppConnection32DelInputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Phase:           "Created",
+		Connections:     DCIAppConnection32Add.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection32DelStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection32Del.Spec.Connections,
+	InputEndpoints:  DCIAppConnection32Del.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection32Del.Spec.OutputEndpoints,
+}
+
+var ConnectEndpoint32AddFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint10FromX1.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToY,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToY1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToY1,
+					},
+				},
+			},
+		},
+		InputEndpoint: &ConnectEndpoint01FromX1SpecInputEndpoint,
+	},
+}
+var ConnectEndpoint32AddToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint10ToY1.Spec.From,
+		To:             ConnectEndpoint10ToY1.Spec.To,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+var ConnectEndpoint32DelToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint10ToY1.Spec.From,
+		To:             ConnectEndpoint10ToY1.Spec.To,
+		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection33Add = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection10.TypeMeta,
+	ObjectMeta: DCIAppConnection10.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToA,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToC,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToC,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection33AddStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection33Add.Spec.Connections,
+	InputEndpoints:  DCIAppConnection33Add.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection33Add.Spec.OutputEndpoints,
+}
+
+var DCIAppConnection33Del = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection10.TypeMeta,
+	ObjectMeta: DCIAppConnection10.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Phase:           "Created",
+		Connections:     DCIAppConnection33Add.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection33DelStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection33Del.Spec.Connections,
+	InputEndpoints:  DCIAppConnection33Del.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection33Del.Spec.OutputEndpoints,
+}
+
+var ConnectEndpoint33AddFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint10FromX1.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToA,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA1,
+					}, {
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA2,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA2,
+					},
+				},
+			}, {
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToC,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToC1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToC1,
+					},
+				},
+			}, {
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToY,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToY1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToY1,
+					},
+				},
+			},
+		},
+		InputEndpoint: &ConnectEndpoint01FromX1SpecInputEndpoint,
+	},
+}
+var ConnectEndpoint33AddToY1 = ConnectEndpoint10ToY1
+var ConnectEndpoint33DelFromX1 = ConnectEndpoint10FromX1
+var ConnectEndpoint33DelToY1 = ConnectEndpoint10ToY1
+
+var DCIAppConnection34Add = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection10.TypeMeta,
+	ObjectMeta: DCIAppConnection10.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection34AddInputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection34AddInputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8554",
+			"rtsp://localhost:8555",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8556",
+			"rtsp://localhost:8557",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"rtsp://localhost:8558",
+			"rtsp://localhost:8559",
+		},
+	},
+}
+var DCIAppConnection34AddStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection34Add.Spec.Connections,
+	InputEndpoints:  DCIAppConnection34Add.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection34Add.Spec.OutputEndpoints,
+}
+
+var DCIAppConnection34Del = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection10.TypeMeta,
+	ObjectMeta: DCIAppConnection10.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Phase:           "Created",
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection34AddInputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection34DelStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection34Del.Spec.Connections,
+	InputEndpoints:  DCIAppConnection34Del.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection34Del.Spec.OutputEndpoints,
+}
+
+var ConnectEndpoint34AddFromX1 = ConnectEndpoint10FromX1
+var ConnectEndpoint34AddToY1SpecInputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"rtsp://localhost:8558",
+		"rtsp://localhost:8559",
+	},
+}
+var ConnectEndpoint34AddToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint10ToY1.Spec.From,
+		To:             ConnectEndpoint10ToY1.Spec.To,
+		InputEndpoint:  &ConnectEndpoint34AddToY1SpecInputEndpoint,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+var ConnectEndpoint34DelFromX1 = ConnectEndpoint10FromX1
+var ConnectEndpoint34DelToY1 = ConnectEndpoint10ToY1
+
+var DCIAppConnection35Add = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection10.TypeMeta,
+	ObjectMeta: DCIAppConnection10.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection35AddOutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+
+var DCIAppConnection35AddOutputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8601",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8602",
+			"https://localhost:8603",
+		},
+	}, {
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"http://localhost:8604",
+			"http://localhost:8605",
+		},
+	},
+}
+var DCIAppConnection35AddStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection35Add.Spec.Connections,
+	InputEndpoints:  DCIAppConnection35Add.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection35Add.Spec.OutputEndpoints,
+}
+
+var DCIAppConnection35Del = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection10.TypeMeta,
+	ObjectMeta: DCIAppConnection10.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Phase:           "Created",
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection35AddOutputEndpoints,
+	},
+}
+
+var DCIAppConnection35DelStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection35Del.Spec.Connections,
+	InputEndpoints:  DCIAppConnection35Del.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection35Del.Spec.OutputEndpoints,
+}
+
+var ConnectEndpoint35AddFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint10FromX1.Spec.From,
+		To:             ConnectEndpoint10FromX1.Spec.To,
+		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		OutputEndpoint: &ConnectEndpoint35AddFromX1SpecOutputEndpoint,
+	},
+}
+var ConnectEndpoint35AddFromX1SpecOutputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"http://localhost:8604",
+		"http://localhost:8605",
+	},
+}
+var ConnectEndpoint35AddToY1 = ConnectEndpoint10ToY1
+var ConnectEndpoint35DelFromX1 = ConnectEndpoint10FromX1
+var ConnectEndpoint35DelToY1 = ConnectEndpoint10ToY1
+
+var DCIAppConnection36 = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     nil,
+		InputEndpoints:  nil,
+		OutputEndpoints: nil,
+	},
+}
+var DCIAppConnection36Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection36.Spec.Connections,
+	InputEndpoints:  DCIAppConnection36.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection36.Spec.OutputEndpoints,
+}
+
+var DCIAppConnection38Add = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     nil,
+		InputEndpoints:  nil,
+		OutputEndpoints: nil,
+	},
+}
+var DCIAppConnection38AddStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection38Add.Spec.Connections,
+	InputEndpoints:  DCIAppConnection38Add.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection38Add.Spec.OutputEndpoints,
+}
+var DCIAppConnection38Del = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     nil,
+		InputEndpoints:  nil,
+		OutputEndpoints: nil,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Phase:           "Created",
+		Connections:     DCIAppConnection38Add.Spec.Connections,
+		InputEndpoints:  DCIAppConnection38Add.Spec.InputEndpoints,
+		OutputEndpoints: DCIAppConnection38Add.Spec.OutputEndpoints,
+	},
+}
+var DCIAppConnection38DelStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection38Del.Spec.Connections,
+	InputEndpoints:  DCIAppConnection38Del.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection38Del.Spec.OutputEndpoints,
+}
+var ConnectEndpoint38AddFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01FromX1.Spec.From,
+		To:             nil,
+		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		OutputEndpoint: nil,
+	},
+}
+var ConnectEndpoint38AddToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		To:             nil,
+		InputEndpoint:  nil,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection39Chg = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection39ChgOutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnectionCE01OutputEndpoints,
+	},
+}
+var DCIAppConnection39ChgOutputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8601",
+		},
+	},
+}
+
+var DCIAppConnection39ChgStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection39Chg.Spec.Connections,
+	InputEndpoints:  DCIAppConnection39Chg.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection39Chg.Spec.OutputEndpoints,
+}
+var ConnectEndpoint39BfrFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01FromX1.Spec.From,
+		To:             nil,
+		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		OutputEndpoint: &ConnectEndpointCE01OutputEndpoint,
+	},
+}
+var ConnectEndpoint39ChgFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01FromX1.Spec.From,
+		To:             nil,
+		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		OutputEndpoint: nil,
+	},
+}
+var ConnectEndpoint39ChgToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		To:             nil,
+		InputEndpoint:  nil,
+		OutputEndpoint: &ConnectEndpointCE01OutputEndpoint,
+	},
+}
+
+var DCIAppConnection39ChgURL = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnectionCE02OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnectionCE01OutputEndpoints,
+	},
+}
+var DCIAppConnection39ChgURLStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection39ChgURL.Spec.Connections,
+	InputEndpoints:  DCIAppConnection39ChgURL.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection39ChgURL.Spec.OutputEndpoints,
+}
+var ConnectEndpoint39ChgURLFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01FromX1.Spec.From,
+		To:             nil,
+		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		OutputEndpoint: &ConnectEndpointCE02OutputEndpoint,
+	},
+}
+
+var DCIAppConnection40Chg = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection40ChgInputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection40BfrInputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+var DCIAppConnection40BfrInputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameFromX,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8601",
+		},
+	},
+}
+var DCIAppConnection40ChgInputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8601",
+		},
+	},
+}
+var DCIAppConnection40ChgStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection40Chg.Spec.Connections,
+	InputEndpoints:  DCIAppConnection40Chg.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection40Chg.Spec.OutputEndpoints,
+}
+var ConnectEndpoint40ChgToYSpecInputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"https://localhost:8600",
+		"https://localhost:8601",
+	},
+}
+var ConnectEndpoint40BfrToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		To:             nil,
+		InputEndpoint:  nil,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+var ConnectEndpoint40ChgToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		To:             nil,
+		InputEndpoint:  &ConnectEndpoint40ChgToYSpecInputEndpoint,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection40ChgURL = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection40ChgURLInputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection40ChgInputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+var DCIAppConnection40ChgURLInputEndpoints = []examplecomv1.DCIAppConnectionExternalEndpoint{
+	{
+		Internal: examplecomv1.TargetRef{
+			DeploymentRef: examplecomv1.NamespaceName{
+				Name:      cDeployment01NameToY,
+				Namespace: cDeploymentNamespace,
+			},
+		},
+		ExternalSubsets: []string{
+			"https://localhost:8600",
+			"https://localhost:8602",
+		},
+	},
+}
+var DCIAppConnection40ChgURLStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection40ChgURL.Spec.Connections,
+	InputEndpoints:  DCIAppConnection40ChgURL.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection40ChgURL.Spec.OutputEndpoints,
+}
+var ConnectEndpoint40ChgURLToYSpecInputEndpoint = examplecomv1.ExternalEndpoint{
+	ExternalSubsets: []string{
+		"https://localhost:8600",
+		"https://localhost:8602",
+	},
+}
+var ConnectEndpoint40ChgURLToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		To:             nil,
+		InputEndpoint:  &ConnectEndpoint40ChgURLToYSpecInputEndpoint,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection41Chg = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToA,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToC,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+var DCIAppConnection41ChgStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection41Chg.Spec.Connections,
+	InputEndpoints:  DCIAppConnection41Chg.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection41Chg.Spec.OutputEndpoints,
+}
+var ConnectEndpoint41ChgFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint10FromX1.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToY,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToY1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToY1,
+					},
+				},
+			},
+		},
+		InputEndpoint: &ConnectEndpoint01FromX1SpecInputEndpoint,
+	},
+}
+var ConnectEndpoint41ChgToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint10ToY1.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToA,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA1,
+					}, {
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA2,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA2,
+					},
+				},
+			}, {
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToC,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToC1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToC1,
+					},
+				},
+			},
+		},
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+var DCIAppConnection41ChgAR = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToA,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToC,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+var DCIAppConnection41ChgARStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection41ChgAR.Spec.Connections,
+	InputEndpoints:  DCIAppConnection41ChgAR.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection41ChgAR.Spec.OutputEndpoints,
+}
+var DCIAppConnection41ChgTo = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToC,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToC,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+var DCIAppConnection41ChgToStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection41ChgTo.Spec.Connections,
+	InputEndpoints:  DCIAppConnection41ChgTo.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection41ChgTo.Spec.OutputEndpoints,
+}
+var ConnectEndpoint41ChgToFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint10FromX1.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToC,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToC1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToC1,
+					},
+				},
+			}, {
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToY,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToY1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToY1,
+					},
+				},
+			},
+		},
+		InputEndpoint: &ConnectEndpoint01FromX1SpecInputEndpoint,
+	},
+}
+var DCIAppConnection41ChgToDel = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToA,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections:     DCIAppConnection41ChgTo.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+var DCIAppConnection41ChgToDelStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection41ChgToDel.Spec.Connections,
+	InputEndpoints:  DCIAppConnection41ChgToDel.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection41ChgToDel.Spec.OutputEndpoints,
+}
+var ConnectEndpoint41ChgToDelToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint10ToY1.Spec.From,
+		To:             nil,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection42 = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Phase:           "Created",
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection26InputEndpoints,
+		OutputEndpoints: DCIAppConnection26OutputEndpoints,
+	},
+}
+
+var DCIAppConnection42Status = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection42.Spec.Connections,
+	InputEndpoints:  DCIAppConnection42.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection42.Spec.OutputEndpoints,
+}
+var DCIAppConnection42Add = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections:     DCIAppConnection10.Spec.Connections,
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Phase:           "Created",
+		Connections:     nil,
+		InputEndpoints:  DCIAppConnection27InputEndpoints,
+		OutputEndpoints: DCIAppConnection27OutputEndpoints,
+	},
+}
+
+var DCIAppConnection42AddStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection42Add.Spec.Connections,
+	InputEndpoints:  DCIAppConnection42Add.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection42Add.Spec.OutputEndpoints,
+}
+var ConnectEndpoint42AddFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01FromX1.Spec.From,
+		To:             ConnectEndpoint01FromX1.Spec.To,
+		InputEndpoint:  &ConnectEndpoint27FromX1SpecInputEndpoint,
+		OutputEndpoint: nil,
+	},
+}
+var ConnectEndpoint42AddToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		OutputEndpoint: &ConnectEndpoint27ToY1SpecOutputEndpoint,
+	},
+}
+
+var DCIAppConnection43Del = examplecomv1.DCIAppConnection{
+	TypeMeta:   DCIAppConnection01.TypeMeta,
+	ObjectMeta: DCIAppConnection01.ObjectMeta,
+	Spec: examplecomv1.DCIAppConnectionSpec{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToA,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnectionCE01OutputEndpoints,
+	},
+	Status: examplecomv1.DCIAppConnectionStatus{
+		Connections: []examplecomv1.Connection{
+			{
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToA,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			}, {
+				From: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameFromX,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+				To: examplecomv1.TargetRef{
+					DeploymentRef: examplecomv1.NamespaceName{
+						Name:      cDeployment01NameToY,
+						Namespace: cDeploymentNamespace,
+					},
+				},
+			},
+		},
+		InputEndpoints:  DCIAppConnection01InputEndpoints,
+		OutputEndpoints: DCIAppConnection01OutputEndpoints,
+	},
+}
+var DCIAppConnection43DelStatus = examplecomv1.DCIAppConnectionStatus{
+	Phase:           "Created",
+	Connections:     DCIAppConnection43Del.Spec.Connections,
+	InputEndpoints:  DCIAppConnection43Del.Spec.InputEndpoints,
+	OutputEndpoints: DCIAppConnection43Del.Spec.OutputEndpoints,
+}
+var ConnectEndpoint43BfrToY1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01ToY1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01ToY1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From:           ConnectEndpoint01ToY1.Spec.From,
+		To:             nil,
+		InputEndpoint:  nil,
+		OutputEndpoint: &ConnectEndpoint01ToY1SpecOutputEndpoint,
+	},
+}
+var ConnectEndpoint43DelFromX1 = examplecomv1.ConnectEndpoint{
+	TypeMeta:   ConnectEndpoint01FromX1.TypeMeta,
+	ObjectMeta: ConnectEndpoint01FromX1.ObjectMeta,
+	Spec: examplecomv1.ConnectEndpointSpec{
+		From: ConnectEndpoint10FromX1.Spec.From,
+		To: []examplecomv1.ToDeployment{
+			{
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToA,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA1,
+					}, {
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToA2,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToA2,
+					},
+				},
+			}, {
+				DeploymentRef: examplecomv1.NamespacedName{
+					Name:      cDeployment01NameToY,
+					Namespace: cDeploymentNamespace,
+				},
+				ToPod: []examplecomv1.ToPod{
+					{
+						PodRef: examplecomv1.NamespacedName{
+							Name:      cPod01NameToY1,
+							Namespace: cPodNamespace,
+						},
+						Address: cPod01IpAddressToY1,
+					},
+				},
+			},
+		},
+		InputEndpoint:  &ConnectEndpoint01FromX1SpecInputEndpoint,
+		OutputEndpoint: &ConnectEndpointCE01OutputEndpoint,
 	},
 }

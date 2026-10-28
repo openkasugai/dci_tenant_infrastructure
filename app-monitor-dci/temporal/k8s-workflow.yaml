@@ -35,7 +35,7 @@ spec:
         node-role.kubernetes.io/control-plane: ""
       containers:
       - name: worker
-        image: 'localhost/temporal-workflow:0.3.4'
+        image: 'localhost/temporal-workflow:1.0.0'
         imagePullPolicy: IfNotPresent
         env:
         - name: TEMPORAL_NAMESPACE
@@ -49,4 +49,4 @@ spec:
         - name: RESOURCE_API_VERSION
           value: "v1"
         - name: HISTORY_EVENT_THRESHOLD
-          value: "25000"
+          value: "10000"

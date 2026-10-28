@@ -1,24 +1,17 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package testutils
 
 import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	// TODO: Switch to "k8s.io/api/resource/v1" once DeviceTaintRule is supported in v1.
+	// DeviceTaintRule is currently available only in v1beta2, so we use v1beta2 for now.
+	// However, ResourceSlice in v1beta2 is deprecated in v1.36+ and will be removed in v1.39+,
+	// so we should migrate to v1 as soon as DeviceTaintRule is available there.
+	resourcev1beta "k8s.io/api/resource/v1beta2"
+
 	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -214,6 +207,9 @@ func NewMachineDeployment(
 			},
 			Template: capiv1.MachineTemplateSpec{
 				Spec: capiv1.MachineSpec{
+					Deletion: capiv1.MachineDeletionSpec{
+						NodeDrainTimeoutSeconds: ptr.To(int32(180)),
+					},
 					ClusterName: clusterName,
 					Bootstrap: capiv1.Bootstrap{
 						ConfigRef: capiv1.ContractVersionedObjectReference{
@@ -302,6 +298,8 @@ func NewDCIMachineTemplate(
 
 // NewDockerMachineTemplate returns *capdockerv1.DockerMachineTemplate by one line.
 // Location and ServerSpec are nil and empty.
+//
+//nolint:staticcheck // capdockerv1.DockerMachineTemplate is deprecated but still used because this is only for test purpose
 func NewDockerMachineTemplate(
 	name, namespace string,
 ) *capdockerv1.DockerMachineTemplate {
@@ -363,6 +361,63 @@ func NewLogicalServer(
 			},
 		},
 	}
+}
+
+// NewDeviceTaintRule returns *resourcev1beta.DeviceTaintRule by one line.
+func NewDeviceTaintRule(
+	name, key, val string, effect resourcev1beta.DeviceTaintEffect,
+	driverName, poolName, deviceName *string,
+) *resourcev1beta.DeviceTaintRule {
+	return &resourcev1beta.DeviceTaintRule{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: resourcev1beta.DeviceTaintRuleSpec{
+			Taint: resourcev1beta.DeviceTaint{
+				Key:    key,
+				Value:  val,
+				Effect: effect,
+			},
+			DeviceSelector: &resourcev1beta.DeviceTaintSelector{
+				Driver: driverName,
+				Pool:   poolName,
+				Device: deviceName,
+			},
+		},
+	}
+}
+
+// NewResourceSlice returns *resourcev1.ResourceSlice by one line.
+func NewResourceSlice(
+	name, driverName, poolName string, devices map[string]map[string]string,
+) *resourcev1.ResourceSlice {
+	rs := &resourcev1.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: resourcev1.ResourceSliceSpec{
+			Driver:   driverName,
+			NodeName: &poolName,
+			Pool: resourcev1.ResourcePool{
+				Name:               poolName,
+				ResourceSliceCount: int64(len(devices)),
+			},
+			Devices: make([]resourcev1.Device, 0, len(devices)),
+		},
+	}
+	for deviceName, device := range devices {
+		attrs := map[resourcev1.QualifiedName]resourcev1.DeviceAttribute{}
+		for key, val := range device {
+			attrs[resourcev1.QualifiedName(key)] = resourcev1.DeviceAttribute{
+				StringValue: &val,
+			}
+		}
+		rs.Spec.Devices = append(rs.Spec.Devices, resourcev1.Device{
+			Name:       deviceName,
+			Attributes: attrs,
+		})
+	}
+	return rs
 }
 
 // NewCardScalingRequest returns *scalev1.CardScalingRequest by one line.

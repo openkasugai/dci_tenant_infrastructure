@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
@@ -104,16 +90,13 @@ func TestMonitorWorkflow_ContinueAsNewWhenHistoryThresholdReached(t *testing.T) 
 	env := ts.NewTestWorkflowEnvironment()
 
 	origThreshold := HistoryEventThreshold
-	origKeepAliveInterval := keepAliveInterval
 	origCurrentHistoryLengthFn := currentHistoryLengthFn
 	defer func() {
 		HistoryEventThreshold = origThreshold
-		keepAliveInterval = origKeepAliveInterval
 		currentHistoryLengthFn = origCurrentHistoryLengthFn
 	}()
 
 	HistoryEventThreshold = 6
-	keepAliveInterval = 0
 	historyChecks := 0
 	currentHistoryLengthFn = func(ctx workflow.Context) int {
 		historyChecks++
@@ -465,14 +448,11 @@ func TestMonitorWorkflow_IsDrainingQuery(t *testing.T) {
 	env := ts.NewTestWorkflowEnvironment()
 
 	origThreshold := HistoryEventThreshold
-	origKeepAliveInterval := keepAliveInterval
 	defer func() {
 		HistoryEventThreshold = origThreshold
-		keepAliveInterval = origKeepAliveInterval
 	}()
 
 	HistoryEventThreshold = DefaultHistoryEventThreshold
-	keepAliveInterval = 0
 
 	registerWorkflowTestActivities(env,
 		func(ctx context.Context, podState shared.PodUpdateStatus) (*shared.PodUpdateStatus, error) {

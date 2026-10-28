@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -267,20 +253,20 @@ var _ = Describe("DCIAppConnection Controller", func() {
 			// ------------------------------
 			dciappconnection_common_SubnormalTest06_2(writer, reconciler, mockClient)
 		})
-		It("DCIAppConnection Create Pod X1 Status.Phase Not Rounning", func() {
+		It("DCIAppConnection Create Pod X1 Status.Connections Not Ready", func() {
 			By("SubnormalTest07_1: Reconciling the create resource")
 			// ------------------------------
-			//  SubnormalTest07_1 Create Pod X1 Status.Phase Not Rounning
+			//  SubnormalTest07_1 Create Pod X1 Status.Connections Not Ready
 			//  X-A,Y-C X-Y
 			//  Y-None
 			//  In-X,Out-Y
 			// ------------------------------
 			dciappconnection_common_SubnormalTest07_1(writer, reconciler, mockClient)
 		})
-		It("DCIAppConnection Delete Pod X1 Status.Phase Not Rounning", func() {
+		It("DCIAppConnection Delete Pod X1 Status.Connections Not Ready", func() {
 			By("SubnormalTest07_2: Reconciling the delete resource")
 			// ------------------------------
-			//  SubnormalTest07_2 Delete Pod X1 Status.Phase Not Rounning
+			//  SubnormalTest07_2 Delete Pod X1 Status.Connections Not Ready
 			//  X-A,Y-C X-Y
 			//  Y-None
 			//  In-X,Out-Y

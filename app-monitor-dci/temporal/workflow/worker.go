@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
@@ -40,10 +26,10 @@ type temporalClient interface {
 
 // temporalWorker abstracts the Temporal worker for testing.
 type temporalWorker interface {
-	RegisterWorkflow(w interface{})
-	RegisterActivity(a interface{})
-	RegisterActivityWithOptions(a interface{}, options activity.RegisterOptions)
-	Run(<-chan interface{}) error
+	RegisterWorkflow(w any)
+	RegisterActivity(a any)
+	RegisterActivityWithOptions(a any, options activity.RegisterOptions)
+	Run(<-chan any) error
 }
 
 // temporalClientDial is an indirection for client.Dial so tests can replace it.
@@ -65,8 +51,8 @@ var workerNew = func(c temporalClient, taskQueue string, options worker.Options)
 }
 
 type Activities struct {
-	K8sClient      k8sclient.Client
-	Scheme         *runtime.Scheme
+	K8sClient k8sclient.Client
+	Scheme    *runtime.Scheme
 }
 
 func (acts *Activities) VectorSignalActivity(ctx context.Context, podState shared.PodUpdateStatus) (*shared.PodUpdateStatus, error) {

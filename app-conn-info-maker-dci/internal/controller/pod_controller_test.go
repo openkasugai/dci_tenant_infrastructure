@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -478,6 +464,46 @@ var _ = Describe("Pod Controller", func() {
 			pod_controller_Test16_2_3(writer, reconciler)
 		})
 		It("Pod Create", func() {
+			By("Test17-1: Reconciling the created resource")
+			// ------------------------------
+			//	Test17-1 Pod Create In/Out Merge
+			//  X-A,X-Y (A=Replicas 1to2)
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			pod_controller_Test17_1(writer, reconciler)
+		})
+		It("Pod Create", func() {
+			By("Test17-2: Reconciling the created resource")
+			// ------------------------------
+			//	Test17-2 Pod Create In/Out Merge
+			//  X-A,X-Y
+			//  Y-C (C=Replicas 1to2)
+			//  In-X,Out-Y
+			// ------------------------------
+			pod_controller_Test17_2(writer, reconciler)
+		})
+		It("Pod Create", func() {
+			By("Test17-3: Reconciling the created resource")
+			// ------------------------------
+			//	Test17-3 Pod Create In/Out Merge
+			//  X-A,X-Y (X=Replicas 1to2)
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			pod_controller_Test17_3(writer, reconciler)
+		})
+		It("Pod Create", func() {
+			By("Test17-4: Reconciling the created resource")
+			// ------------------------------
+			//	Test17-4 Pod Create In/Out Merge
+			//  X-A,X-Y (Y=Replicas 1to2)
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			pod_controller_Test17_4(writer, reconciler)
+		})
+		It("Pod Create", func() {
 			By("Test21-1: Reconciling the created resource")
 			// ------------------------------
 			//	Test21-1 Pod Create PodA2 CR NotFound
@@ -560,7 +586,7 @@ var _ = Describe("Pod Controller", func() {
 		It("Pod Create", func() {
 			By("Test32-1: Reconciling the created resource")
 			// ------------------------------
-			//	Test32-1 Pod Create ToY1 Not Running
+			//	Test32-1 Pod Create ToY1 Not Ready
 			//  X-A,Y-C,X-Y (X=Replicas 1to2)
 			//  Y-None
 			//  In-X,Out-Y
@@ -570,7 +596,7 @@ var _ = Describe("Pod Controller", func() {
 		It("Pod Create", func() {
 			By("Test33-1: Reconciling the created resource")
 			// ------------------------------
-			//	Test33-1 Pod Create In Y & FromX1 Not Running
+			//	Test33-1 Pod Create In Y & FromX1 Not Ready
 			//  X-A,Y-C,X-Y (X=Replicas 1to2)
 			//  Y-None
 			//  In-X,Out-Y

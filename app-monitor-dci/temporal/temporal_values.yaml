@@ -609,8 +609,8 @@ cassandra:
     ports:
       cql: 9042
     num_tokens: 4
-    max_heap_size: 512M
-    heap_new_size: 128M
+    max_heap_size: 1024M
+    heap_new_size: 256M
     seed_size: 2
     endpoint_snitch: GossipingPropertyFileSnitch
     dc_name: "DC1"

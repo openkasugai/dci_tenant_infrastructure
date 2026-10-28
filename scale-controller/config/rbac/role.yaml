@@ -7,14 +7,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - events
-  verbs:
-  - create
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
   - nodes
   verbs:
   - get
@@ -50,6 +42,14 @@ rules:
   - nodescalingrequests/status
   verbs:
   - get
+  - patch
+  - update
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
   - patch
   - update
 - apiGroups:

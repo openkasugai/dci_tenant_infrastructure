@@ -164,10 +164,10 @@ install_scale_controller() {
         helm install scale-controller ${dir_repo_top}/dist/scale-controller-${scale_controller_helm_chart_version//\"/}.tgz \
             --create-namespace \
             --namespace ${namespace} \
-            --set controllerManager.container.env.PROVIDER_NAME=Docker \
-            --set controllerManager.container.image.repository=${scale_controller_image_name} \
-            --set controllerManager.container.image.tag=${scale_controller_image_tag} \
-            --set alertReceiver.enable=false \
+            --set manager.env.PROVIDER_NAME=Docker \
+            --set manager.image.repository=${scale_controller_image_name} \
+            --set manager.image.tag=${scale_controller_image_tag} \
+            --set alertReceiver.enabled=false \
             --set-file managementKubeconfig=${kubeconfig_file} \
             --kubeconfig ${cluster_name_w}.kubeconfig
     fi

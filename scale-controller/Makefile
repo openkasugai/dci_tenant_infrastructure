@@ -45,7 +45,7 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
-manifests: manifests-kustomize manifests-helm ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: manifests-kustomize ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 manifests-kustomize: controller-gen
 	@echo "Generating CRDs and RBAC for kustomize..."
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
@@ -187,7 +187,14 @@ buildah-push: ## Push image with the manager.
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
 	mkdir -p dist
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > dist/install.yaml
+	@if [[ "$${BUILD_INSTALLER_INCLUDE_ALERT_RECEIVER}" == "true" ]]; then \
+		cd config/alert-receiver/receiver && $(KUSTOMIZE) edit set image alert-receiver=${ALERT_RECEIVER_IMG}; \
+	fi
+	$(KUSTOMIZE) build $${BUILD_INSTALLER_KUSTOMIZE_PATH:-config/default} > dist/install.yaml
+
+.PHONY: build-installer-alert-receiver
+build-installer-alert-receiver: ## Generate a consolidated YAML with CRDs and deployment (with alert-receiver overlay).
+	BUILD_INSTALLER_INCLUDE_ALERT_RECEIVER=true BUILD_INSTALLER_KUSTOMIZE_PATH=config/overlays/alert-receiver $(MAKE) build-installer
 
 .PHONY: build-installer-debug
 build-installer-debug: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
@@ -394,3 +401,50 @@ $(MOCK_FILE_HELPERCLIENT): | $(MOCK_DIR)
 mockgen-clean: ## Clean up generated mock files.
 	@rm -f $(MOCK_FILES)
 	@rmdir --ignore-fail-on-non-empty $(MOCK_DIR)
+
+##@ Helm Deployment
+
+## Helm binary to use for deploying the chart
+HELM ?= helm
+## Namespace to deploy the Helm release
+HELM_NAMESPACE ?= scale-controller-system
+## Name of the Helm release
+HELM_RELEASE ?= scale-controller
+## Path to the Helm chart directory
+HELM_CHART_DIR ?= dist/chart
+## Additional arguments to pass to helm commands
+HELM_EXTRA_ARGS ?=
+
+.PHONY: install-helm
+install-helm: ## Install the latest version of Helm.
+	@command -v $(HELM) >/dev/null 2>&1 || { \
+		echo "Installing Helm..." && \
+		curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash; \
+	}
+
+.PHONY: helm-deploy
+helm-deploy: install-helm ## Deploy manager to the K8s cluster via Helm. Specify an image with IMG.
+	$(HELM) upgrade --install $(HELM_RELEASE) $(HELM_CHART_DIR) \
+		--namespace $(HELM_NAMESPACE) \
+		--create-namespace \
+		--set manager.image.repository=$${IMG%:*} \
+		--set manager.image.tag=$${IMG##*:} \
+		--wait \
+		--timeout 5m \
+		$(HELM_EXTRA_ARGS)
+
+.PHONY: helm-uninstall
+helm-uninstall: ## Uninstall the Helm release from the K8s cluster.
+	$(HELM) uninstall $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-status
+helm-status: ## Show Helm release status.
+	$(HELM) status $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-history
+helm-history: ## Show Helm release history.
+	$(HELM) history $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-rollback
+helm-rollback: ## Rollback to previous Helm release.
+	$(HELM) rollback $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)

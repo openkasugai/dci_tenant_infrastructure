@@ -26,7 +26,7 @@ data:
     scrape_interval_secs = 10
     scrape_timeout_secs = 5
     decoding.codec = "json"
-    
+
     [sources.no_endpoint_tick]
     type = "exec"
     # Tick event is intentionally delayed so that it always arrives
@@ -36,7 +36,7 @@ data:
     #
     # Cross-period races are acceptable by design and are monitored
     # operationally rather than eliminated structurally.
-    command = ["sh", "-c", "sleep 2; echo '{}'"]
+    command = ["sh", "-c", "sleep 5; echo '{}'"]
     mode = "scheduled"
     scheduled.exec_interval_secs = 10
     decoding.codec = "json"
@@ -117,8 +117,7 @@ data:
     group_by = ["pod_uid"]
     merge_strategies.status_info = "retain"
     merge_strategies.metrics_info = "retain"
-    starts_when = '.data_source == "tick"'
-    flush_period_ms = 3000
+    flush_period_ms = 6000
     max_events = 3
 
     ### Final CR structure
@@ -175,7 +174,7 @@ data:
 
     [sinks.argoevents_trigger_event.healthcheck]
     enabled = true
-    
+
     [sinks.final_cr_structure_dropped_log]
     type = "console"
     inputs = ["final_cr_structure.dropped"]
@@ -246,7 +245,7 @@ data:
     #
     # Cross-period races are acceptable by design and are monitored
     # operationally rather than eliminated structurally.
-    command = ["sh", "-c", "sleep 2; echo '{}'"]
+    command = ["sh", "-c", "sleep 5; echo '{}'"]
     mode = "scheduled"
     scheduled.exec_interval_secs = 10
     decoding.codec = "json"
@@ -301,14 +300,13 @@ data:
     inputs = ["transform_status_to_cr","tag_tick_data"]
     group_by = ["pod_uid"]
     merge_strategies.status_info = "retain"
-    starts_when = '.data_source == "tick"'
-    flush_period_ms = 3000
+    flush_period_ms = 6000
     max_events = 2
 
     ### Final CR structure
     ### - status: If the status endpoint responds, outputs the return value, if it does'nt respond, outputs "error:xxx"
-    ### - metrics: always empty value({}) 
-    ### - metas  : always empty value({}) 
+    ### - metrics: always empty value({})
+    ### - metas  : always empty value({})
     [transforms.final_cr_structure]
     type = "remap"
     inputs = ["create_unified_event"]
@@ -397,7 +395,7 @@ data:
     #
     # Cross-period races are acceptable by design and are monitored
     # operationally rather than eliminated structurally.
-    command = ["sh", "-c", "sleep 2; echo '{}'"]
+    command = ["sh", "-c", "sleep 5; echo '{}'"]
     mode = "scheduled"
     scheduled.exec_interval_secs = 10
     decoding.codec = "json"
@@ -455,14 +453,13 @@ data:
     inputs = ["transform_metrics_to_cr","tag_tick_data"]
     group_by = ["pod_uid"]
     merge_strategies.metrics_info = "retain"
-    starts_when = '.data_source == "tick"'
-    flush_period_ms = 3000
+    flush_period_ms = 6000
     max_events = 2
 
     ### Final CR structure
-    ### - status: always empty value({}) 
+    ### - status: always empty value({})
     ### - metrics: If the metrics endpoint responds, outputs the return value, if it does'nt respond, outputs "error:xxx"
-    ### - metas  : always empty value({}) 
+    ### - metas  : always empty value({})
     [transforms.final_cr_structure]
     type = "remap"
     inputs = ["create_unified_event"]
@@ -563,7 +560,7 @@ data:
     #
     # Cross-period races are acceptable by design and are monitored
     # operationally rather than eliminated structurally.
-    command = ["sh", "-c", "sleep 2; echo '{}'"]
+    command = ["sh", "-c", "sleep 5; echo '{}'"]
     mode = "scheduled"
     scheduled.exec_interval_secs = 10
     decoding.codec = "json"

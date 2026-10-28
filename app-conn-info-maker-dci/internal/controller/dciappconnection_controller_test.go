@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -554,6 +540,296 @@ var _ = Describe("DCIAppConnection Controller", func() {
 			//  In-X,Out-Y
 			// ------------------------------
 			dciappconnection_controller_Test25_2(writer, reconciler)
+		})
+		It("DCIAppConnection Create", func() {
+			By("Test26_1: Reconciling the created resource")
+			// ------------------------------
+			//  Test26_1 Create
+			//  X-A,Y-C X-Y
+			//  Y-None
+			//  In-X(Merge),Out-Y(Merge)
+			// ------------------------------
+			dciappconnection_controller_Test26_1(writer, reconciler)
+		})
+		It("DCIAppConnection Delete", func() {
+			By("Test26_2: Reconciling the delete resource")
+			// ------------------------------
+			//  Test26_2 Delete
+			//  X-A,Y-C X-Y
+			//  Y-None
+			//  In-X(Merge),Out-Y(Merge)
+			// ------------------------------
+			dciappconnection_controller_Test26_2(writer, reconciler)
+		})
+		It("DCIAppConnection Create", func() {
+			By("Test27_1: Reconciling the created resource")
+			// ------------------------------
+			//  Test27_1 Update In/Out 1st Add Merge
+			//  X-None
+			//  Y-None
+			//  In-X(Merge),Out-Y(Merge)
+			// ------------------------------
+			dciappconnection_controller_Test27_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update Y-C Add", func() {
+			By("Test31_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test31_1 Update Y-C Add
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test31_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update Y-C Delete", func() {
+			By("Test31_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test31_2 Update Y-C Delete
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test31_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update X-Y Add", func() {
+			By("Test32_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test32_1 Update X-Y Add
+			//  X-None
+			//  Y-C
+			//  In-Y,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test32_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update X-Y Delete", func() {
+			By("Test32_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test32_2 Update X-Y Delete
+			//  X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test32_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update X-C Add", func() {
+			By("Test33_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test33_1 Update X-C Add
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test33_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update X-C Delete", func() {
+			By("Test33_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test33_2 Update X-C Delete
+			//  X-A X-C X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test33_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update In-Y Add", func() {
+			By("Test34_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test34_1 Update In-Y Add
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test34_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update In-Y Delete", func() {
+			By("Test34_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test34_2 Update In-Y Delete
+			//  X-A X-Y
+			//  Y-C
+			//  In-X In-Y,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test34_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update Out-X Add", func() {
+			By("Test35_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test35_1 Update Out-X Add
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test35_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update Out-X Delete", func() {
+			By("Test35_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test35_2 Update Out-X Delete
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-X Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test35_2(writer, reconciler)
+		})
+		It("DCIAppConnection Create All-None", func() {
+			By("Test36_1: Reconciling the created resource")
+			// ------------------------------
+			//  Test36_1 Create All-None
+			//  X-None
+			//  Y-None
+			//  In-None,Out-None
+			// ------------------------------
+			dciappconnection_controller_Test36_1(writer, reconciler)
+		})
+		It("DCIAppConnection Delete All-None", func() {
+			By("Test36_2: Reconciling the deleted resource")
+			// ------------------------------
+			//  Test36_2 Delete All-None
+			//  X-None
+			//  Y-None
+			//  In-None,Out-None
+			// ------------------------------
+			dciappconnection_controller_Test36_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update NotChange Created", func() {
+			By("Test37_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test37_1 Update NotChange Created
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y Created
+			// ------------------------------
+			dciappconnection_controller_Test37_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update NotChange Pending", func() {
+			By("Test37_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test37_2 Update NotChange Pending
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y Pending
+			// ------------------------------
+			dciappconnection_controller_Test37_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update From None In-X Out-Y Add", func() {
+			By("Test38_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test38_1 Update From None In-X Out-Y Add
+			//  X-None
+			//  Y-None
+			//  In-None,Out-None
+			// ------------------------------
+			dciappconnection_controller_Test38_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update From None In-X Out-Y Delete", func() {
+			By("Test38_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test38_2 Update From None In-X Out-Y Delete
+			//  X-None
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test38_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update From None Out-Y Change", func() {
+			By("Test39_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test39_1 Update From None Out-Y Change
+			//  X-None
+			//  Y-None
+			//  In-X,Out-X
+			// ------------------------------
+			dciappconnection_controller_Test39_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update From None Out-X URL Change", func() {
+			By("Test39_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test39_2 Update From None Out-Y URL Change
+			//  X-None
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test39_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update From None In-Y Change", func() {
+			By("Test40_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test40_1 Update From None In-Y Change
+			//  X-None
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test40_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update From None In-X URL Change", func() {
+			By("Test40_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test40_2 Update From None In-X URL Change
+			//  X-None
+			//  Y-None
+			//  In-Y,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test40_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update From X-A->Y-A Change", func() {
+			By("Test41_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test41_1 Update From X-A->Y-A Change
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test41_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update To X-A->X-C Change", func() {
+			By("Test41_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test41_2 Update To X-A->X-C Change
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test41_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update To X-C Delete", func() {
+			By("Test41_3: Reconciling the updated resource")
+			// ------------------------------
+			//  Test41_3 Update To X-C Y-C Delete
+			//  X-C X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test41_3(writer, reconciler)
+		})
+		It("DCIAppConnection Update", func() {
+			By("Test42_1: Reconciling the updated resource")
+			// ------------------------------
+			//  Test42_1 Update Status In/Out 2nd Add Merge ExternalSubsets
+			//  X-None
+			//  Y-None
+			//  In-X(Merge),Out-Y(Merge)
+			// ------------------------------
+			dciappconnection_controller_Test42_1(writer, reconciler)
+		})
+		It("DCIAppConnection Update", func() {
+			By("Test42_2: Reconciling the updated resource")
+			// ------------------------------
+			//  Test42_2 Update Status In/Out 1st Add Merge ExternalSubsets
+			//  X-None
+			//  Y-None
+			//  In-X(Merge),Out-Y(Merge)
+			// ------------------------------
+			dciappconnection_controller_Test42_2(writer, reconciler)
+		})
+		It("DCIAppConnection Update", func() {
+			By("Test43_1: Reconciling the updeted resource")
+			// ------------------------------
+			//  Test43_1 Update From Y Out-Y Delete
+			//  X-A X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_Test43_1(writer, reconciler)
 		})
 		// EventPredicate Tests
 		It("EventPredicate Update Test01", func() {

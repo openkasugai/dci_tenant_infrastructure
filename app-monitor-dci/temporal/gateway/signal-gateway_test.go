@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
@@ -19,18 +5,24 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"temporal/shared"
 
+	enumspb "go.temporal.io/api/enums/v1"
+	workflowpb "go.temporal.io/api/workflow/v1"
+	workflowservice "go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/converter"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,21 +31,34 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 )
+
+// signalRecord stores one SignalWorkflow call for multi-call inspection in tests.
+type signalRecord struct {
+	workflowID string
+	signalName string
+	arg        interface{}
+}
 
 // fakeClient implements temporalClient for testing.
 type fakeClient struct {
-	options        client.Options
-	signalCalled   int
-	lastWorkflowID string
-	lastRunID      string
-	lastSignalName string
-	lastSignalArg  interface{}
-	signalErr      error
-	queryErr       error
-	queryGetErr    error
-	queryBoolVal   bool
-	closed         bool
+	options         client.Options
+	signalCalled    int
+	lastWorkflowID  string
+	lastRunID       string
+	lastSignalName  string
+	lastSignalArg   interface{}
+	signals         []signalRecord
+	signalErr       error
+	queryErr        error
+	queryErrsByCall []error
+	queryCallCount  int
+	queryGetErr     error
+	queryBoolVal    bool
+	describeErr     error // error returned by DescribeWorkflowExecution
+	workflowClosed  bool  // true = simulate a terminated/closed workflow
+	closed          bool
 }
 
 func (f *fakeClient) SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error {
@@ -62,6 +67,7 @@ func (f *fakeClient) SignalWorkflow(ctx context.Context, workflowID string, runI
 	f.lastRunID = runID
 	f.lastSignalName = signalName
 	f.lastSignalArg = arg
+	f.signals = append(f.signals, signalRecord{workflowID: workflowID, signalName: signalName, arg: arg})
 	return f.signalErr
 }
 
@@ -84,6 +90,16 @@ func (v *fakeEncodedValue) Get(valuePtr interface{}) error {
 }
 
 func (f *fakeClient) QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (converter.EncodedValue, error) {
+	f.queryCallCount++
+	// Use per-call errors when provided (for retry simulation).
+	if len(f.queryErrsByCall) > 0 {
+		err := f.queryErrsByCall[0]
+		f.queryErrsByCall = f.queryErrsByCall[1:]
+		if err != nil {
+			return nil, err
+		}
+		return &fakeEncodedValue{boolVal: f.queryBoolVal, getErr: f.queryGetErr}, nil
+	}
 	if f.queryErr != nil {
 		return nil, f.queryErr
 	}
@@ -91,6 +107,25 @@ func (f *fakeClient) QueryWorkflow(ctx context.Context, workflowID string, runID
 }
 
 func (f *fakeClient) Close() { f.closed = true }
+
+// DescribeWorkflowExecution returns a running execution by default.
+// Set workflowClosed=true to simulate a terminated workflow (CloseTime != nil).
+// Set describeErr to simulate a connection error.
+func (f *fakeClient) DescribeWorkflowExecution(ctx context.Context, workflowID, runID string) (*workflowservice.DescribeWorkflowExecutionResponse, error) {
+	if f.describeErr != nil {
+		return nil, f.describeErr
+	}
+	info := &workflowpb.WorkflowExecutionInfo{
+		Status: enumspb.WORKFLOW_EXECUTION_STATUS_RUNNING,
+	}
+	if f.workflowClosed {
+		info.CloseTime = timestamppb.Now()
+		info.Status = enumspb.WORKFLOW_EXECUTION_STATUS_TERMINATED
+	}
+	return &workflowservice.DescribeWorkflowExecutionResponse{
+		WorkflowExecutionInfo: info,
+	}, nil
+}
 
 func mustMarshalVectorSignalBody(t *testing.T, namespace, pod string) []byte {
 	t.Helper()
@@ -647,13 +682,17 @@ func TestRun_AlertmanagerSignalHandler_ErrorBranches(t *testing.T) {
 	rec = httptest.NewRecorder()
 	http.DefaultServeMux.ServeHTTP(rec, req)
 
-	// 5) SignalWorkflow error
-	alerts := shared.PodAlerts{}
-	alertsBytes, err := json.Marshal(alerts)
+	// 5) SignalWorkflow error — include a real alert so bufferOrSignal is actually called
+	alerts5 := shared.PodAlerts{
+		Alerts: []shared.Alert{
+			{Labels: shared.AlertLabels{Namespace: "ns1", Pod: "pod1"}},
+		},
+	}
+	alertsBytes5, err := json.Marshal(alerts5)
 	if err != nil {
 		t.Fatalf("failed to marshal alerts: %v", err)
 	}
-	outer = shared.OuterStruct{Metadata: string(alertsBytes)}
+	outer = shared.OuterStruct{Metadata: string(alertsBytes5)}
 	body, err = json.Marshal(outer)
 	if err != nil {
 		t.Fatalf("failed to marshal outer: %v", err)
@@ -663,7 +702,7 @@ func TestRun_AlertmanagerSignalHandler_ErrorBranches(t *testing.T) {
 	rec = httptest.NewRecorder()
 	http.DefaultServeMux.ServeHTTP(rec, req)
 
-	// 6) Response write error
+	// 6) Response write error — include an alert so the signal succeeds before the write
 	fc.signalErr = nil
 	req = httptest.NewRequest(http.MethodPost, "/alertmanager-signal", bytes.NewReader(body))
 	ew := &errorWriter{}
@@ -1304,5 +1343,296 @@ func TestStartDrainLoop_FiresFlush(t *testing.T) {
 
 	if fc.signalCalled == 0 {
 		t.Errorf("expected SignalWorkflow to be called by drain loop, got 0 calls")
+	}
+}
+
+// TestRun_AlertmanagerSignalHandler_MultiShardRouting verifies that alerts are
+// distributed to each shard based on each pod's FNV hash, i.e. every shard
+// receives exactly the alerts whose pods map to it.
+func TestRun_AlertmanagerSignalHandler_MultiShardRouting(t *testing.T) {
+	origDial := temporalClientDial
+	origListen := httpListenAndServe
+	origPodExists := podExistsFunc
+	defer func() {
+		temporalClientDial = origDial
+		httpListenAndServe = origListen
+		podExistsFunc = origPodExists
+	}()
+
+	podExistsFunc = func(namespace, podName string) (bool, error) {
+		return true, nil
+	}
+
+	fc := &fakeClient{}
+	temporalClientDial = func(opts client.Options) (temporalClient, error) {
+		return fc, nil
+	}
+	httpListenAndServe = func(addr string, handler http.Handler) error { return nil }
+
+	http.DefaultServeMux = http.NewServeMux()
+	run()
+
+	// Use multiple pods; shardedWorkflowID determines expected routing dynamically.
+	testPods := []string{"pod-alpha", "pod-beta", "pod-gamma", "pod-delta", "pod-epsilon"}
+
+	expectedBuckets := make(map[string][]string) // workflowID → pod names
+	for _, p := range testPods {
+		wfID := shardedWorkflowID(p)
+		expectedBuckets[wfID] = append(expectedBuckets[wfID], p)
+	}
+	if len(expectedBuckets) < 2 {
+		t.Skip("all test pods hash to the same shard; adjust pod names for multi-shard coverage")
+	}
+
+	alerts := shared.PodAlerts{}
+	for _, p := range testPods {
+		alerts.Alerts = append(alerts.Alerts, shared.Alert{
+			Labels: shared.AlertLabels{Namespace: "ns1", Pod: p},
+		})
+	}
+	alertsBytes, err := json.Marshal(alerts)
+	if err != nil {
+		t.Fatalf("failed to marshal alerts: %v", err)
+	}
+	outer := shared.OuterStruct{Metadata: string(alertsBytes)}
+	body, err := json.Marshal(outer)
+	if err != nil {
+		t.Fatalf("failed to marshal outer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/alertmanager-signal", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	http.DefaultServeMux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", rec.Code)
+	}
+	if rec.Body.String() != "Signal sent." {
+		t.Fatalf("unexpected response body: %q", rec.Body.String())
+	}
+
+	// One SignalWorkflow call per distinct shard.
+	if fc.signalCalled != len(expectedBuckets) {
+		t.Fatalf("expected %d SignalWorkflow calls (one per shard), got %d", len(expectedBuckets), fc.signalCalled)
+	}
+
+	// Each recorded signal must target the correct workflow and contain only
+	// alerts whose pods hash to that workflow.
+	for _, sig := range fc.signals {
+		if sig.signalName != "alertmanager-signal" {
+			t.Errorf("unexpected signal name: %q", sig.signalName)
+		}
+		bucket, ok := sig.arg.(*shared.PodAlerts)
+		if !ok {
+			t.Fatalf("expected *shared.PodAlerts arg, got %T", sig.arg)
+		}
+		for _, alert := range bucket.Alerts {
+			pod := alert.Labels.GetPod()
+			if shardedWorkflowID(pod) != sig.workflowID {
+				t.Errorf("alert for pod %q routed to workflow %q, expected %q",
+					pod, sig.workflowID, shardedWorkflowID(pod))
+			}
+		}
+	}
+}
+
+// TestRun_AlertmanagerSignalHandler_EmptyAlerts verifies that a request with
+// zero alerts sends no signal. This differs from the old implementation that
+// always routed to monitor-workflow-0 even for an empty alert list.
+func TestRun_AlertmanagerSignalHandler_EmptyAlerts(t *testing.T) {
+	origDial := temporalClientDial
+	origListen := httpListenAndServe
+	origPodExists := podExistsFunc
+	defer func() {
+		temporalClientDial = origDial
+		httpListenAndServe = origListen
+		podExistsFunc = origPodExists
+	}()
+
+	podExistsFunc = func(namespace, podName string) (bool, error) {
+		return true, nil
+	}
+
+	fc := &fakeClient{}
+	temporalClientDial = func(opts client.Options) (temporalClient, error) {
+		return fc, nil
+	}
+	httpListenAndServe = func(addr string, handler http.Handler) error { return nil }
+
+	http.DefaultServeMux = http.NewServeMux()
+	run()
+
+	alerts := shared.PodAlerts{} // no alerts
+	alertsBytes, err := json.Marshal(alerts)
+	if err != nil {
+		t.Fatalf("failed to marshal alerts: %v", err)
+	}
+	outer := shared.OuterStruct{Metadata: string(alertsBytes)}
+	body, err := json.Marshal(outer)
+	if err != nil {
+		t.Fatalf("failed to marshal outer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/alertmanager-signal", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	http.DefaultServeMux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", rec.Code)
+	}
+	if fc.signalCalled != 0 {
+		t.Fatalf("expected no SignalWorkflow calls for empty alert list, got %d", fc.signalCalled)
+	}
+}
+
+// TestRun_AlertmanagerSignalHandler_SignalError_MultiShard verifies that when
+// SignalWorkflow returns an error the handler returns early without writing a
+// response body.
+func TestRun_AlertmanagerSignalHandler_SignalError_MultiShard(t *testing.T) {
+	origDial := temporalClientDial
+	origListen := httpListenAndServe
+	origPodExists := podExistsFunc
+	defer func() {
+		temporalClientDial = origDial
+		httpListenAndServe = origListen
+		podExistsFunc = origPodExists
+	}()
+
+	podExistsFunc = func(namespace, podName string) (bool, error) {
+		return true, nil
+	}
+
+	fc := &fakeClient{signalErr: errors.New("signal failed")}
+	temporalClientDial = func(opts client.Options) (temporalClient, error) {
+		return fc, nil
+	}
+	httpListenAndServe = func(addr string, handler http.Handler) error { return nil }
+
+	http.DefaultServeMux = http.NewServeMux()
+	run()
+
+	testPods := []string{"pod-alpha", "pod-beta", "pod-gamma", "pod-delta", "pod-epsilon"}
+	alerts := shared.PodAlerts{}
+	for _, p := range testPods {
+		alerts.Alerts = append(alerts.Alerts, shared.Alert{
+			Labels: shared.AlertLabels{Namespace: "ns1", Pod: p},
+		})
+	}
+	alertsBytes, err := json.Marshal(alerts)
+	if err != nil {
+		t.Fatalf("failed to marshal alerts: %v", err)
+	}
+	outer := shared.OuterStruct{Metadata: string(alertsBytes)}
+	body, err := json.Marshal(outer)
+	if err != nil {
+		t.Fatalf("failed to marshal outer: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/alertmanager-signal", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	http.DefaultServeMux.ServeHTTP(rec, req)
+
+	// Handler must return early after the first error; response body must be empty.
+	if rec.Body.Len() != 0 {
+		t.Fatalf("expected empty response body on signal error, got %q", rec.Body.String())
+	}
+}
+
+// --- checkWorkflowAlive tests ---
+
+func captureKlogOutput(t *testing.T, fn func()) string {
+	t.Helper()
+
+	initLoggingOnce.Do(func() {
+		klog.InitFlags(nil)
+	})
+
+	logToStderr := flag.Lookup("logtostderr")
+	if logToStderr == nil {
+		t.Fatal("logtostderr flag is not initialized")
+	}
+	prevLogToStderr := logToStderr.Value.String()
+
+	alsoLogToStderr := flag.Lookup("alsologtostderr")
+	prevAlsoLogToStderr := ""
+	if alsoLogToStderr != nil {
+		prevAlsoLogToStderr = alsoLogToStderr.Value.String()
+	}
+
+	var buf bytes.Buffer
+	if err := flag.Set("logtostderr", "false"); err != nil {
+		t.Fatalf("failed to disable logtostderr: %v", err)
+	}
+	if alsoLogToStderr != nil {
+		if err := flag.Set("alsologtostderr", "false"); err != nil {
+			t.Fatalf("failed to disable alsologtostderr: %v", err)
+		}
+	}
+	klog.SetOutput(&buf)
+
+	defer func() {
+		klog.Flush()
+		klog.SetOutput(os.Stderr)
+		_ = flag.Set("logtostderr", prevLogToStderr)
+		if alsoLogToStderr != nil {
+			_ = flag.Set("alsologtostderr", prevAlsoLogToStderr)
+		}
+	}()
+
+	fn()
+	klog.Flush()
+	return buf.String()
+}
+
+// Test that no error is logged when the workflow is healthy (running).
+func TestCheckWorkflowAlive_HealthyWorkflow(t *testing.T) {
+	fc := &fakeClient{} // workflowClosed=false → running
+	logs := captureKlogOutput(t, func() {
+		checkWorkflowAlive(context.Background(), fc, "monitor-workflow-0")
+	})
+
+	if logs != "" {
+		t.Fatalf("expected no log for healthy workflow, got: %s", logs)
+	}
+}
+
+// Test that an ERROR log is emitted when DescribeWorkflowExecution shows the
+// workflow is closed (CloseTime != nil), which covers terminate/cancel/fail.
+func TestCheckWorkflowAlive_WorkflowClosed(t *testing.T) {
+	fc := &fakeClient{workflowClosed: true}
+	logs := captureKlogOutput(t, func() {
+		checkWorkflowAlive(context.Background(), fc, "monitor-workflow-0")
+	})
+
+	if !strings.Contains(logs, "NOT running") {
+		t.Fatalf("expected 'NOT running' log, got: %s", logs)
+	}
+}
+
+// Test that an ERROR log is emitted when DescribeWorkflowExecution itself fails
+// (e.g. network error or workflow truly not found).
+func TestCheckWorkflowAlive_DescribeError(t *testing.T) {
+	fc := &fakeClient{describeErr: errors.New("connection refused")}
+	logs := captureKlogOutput(t, func() {
+		checkWorkflowAlive(context.Background(), fc, "monitor-workflow-0")
+	})
+
+	if !strings.Contains(logs, "health check error") {
+		t.Fatalf("expected 'health check error' log, got: %s", logs)
+	}
+}
+
+// Test that NO log is emitted when ctx is cancelled (gateway shutting down).
+func TestCheckWorkflowAlive_CtxCancelled_NoFalseAlert(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	fc := &fakeClient{describeErr: errors.New("context cancelled")}
+	logs := captureKlogOutput(t, func() {
+		checkWorkflowAlive(ctx, fc, "monitor-workflow-0")
+	})
+
+	if logs != "" {
+		t.Fatalf("expected no log on ctx cancellation, got: %s", logs)
 	}
 }

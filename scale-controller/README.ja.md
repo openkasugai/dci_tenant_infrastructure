@@ -205,7 +205,7 @@ spec:
 
 5. 1.で取得した `Node` を削除するような `NodeScalingRequest` を作成し、その成功を待つ。 `NodeScalingRequest` が失敗した場合は、 `CardScalingRequest` もエラーとして処理を終了する。
 
-5. 2.で取得したカード増減後の `DCIMachineTemplate` の要求スペックを満たすような `Node` を追加するための `NodeScalingRequest` を作成し、その成功を待つ。 `NodeScalingRequest` が失敗した場合は、 `CardScalingRequest` もエラーとして処理を終了する。
+6. 2.で取得したカード増減後の `DCIMachineTemplate` の要求スペックを満たすような `Node` を追加するための `NodeScalingRequest` を作成し、その成功を待つ。 `NodeScalingRequest` が失敗した場合は、 `CardScalingRequest` もエラーとして処理を終了する。
 
 
 ### CardAlert Controller
@@ -232,10 +232,6 @@ CardAlert Controller の障害対応時の対応方針は大別すると以下�
     - 対象の障害カードを使用している `Pod` を削除し別の `Pod` を作成しようとする
   - `NoSchedule`
     - 対象の障害カードを使用している `Pod` を削除しないが、仮に該当 `Pod` 削除後に同種カードを要求されても払い出さないようにする
-
-> **Note**
-自動交換無効時に作成する `DeviceTaintRule` は現時点ではアルファ版の機能であり、 k8s 起動時に feature-gate の設定などを別途実施する必要がある。
-また、 K8s `v1.34.2` の `DeviceTaintRule` のリソース定義が `v1.35.0` 以降では変更され、期待通り動作しない可能性がある。
 
 `CardAlert` を Workload Cluster に作成すると、 CardAlert Controller がこれを検知し、上記の通りその設定に応じて適切なリソースを作成し障害対応を実施する。
 以下にそのフローを示す。なお、 CardAlert Controller の仕様として、同時に最大一つの `CardAlert` しか処理しないため、ある `CardAlert` が処理進行中は、他の `CardAlert` は保留状態に遷移して、一定時間ごとにリキューして処理の開始を待つ。
@@ -267,10 +263,8 @@ CardAlert Controller の障害対応時の対応方針は大別すると以下�
   - Taint の Key, Value はそれぞれ固定値として、 `dra.example.com/unhealthy`, `Broken` を指定する。
   - Taint の Effect は起動時に環境変数から取得した `NoExecute` か `NoSchedule` を指定する。
   - `DeviceTaintRule` は Cluster-scoped リソースであるため、 `Namespace` は 指定しない。
-  - 障害があると設定する DeviceSelector では、 GPU の UUID をもとに CEL 構文によるデバイス一致確認を行う。
-    - MIG の UUID は有無チェックのみ行い、その値は使わない。
-    - **NOTE**: CEL 構文によるデバイス一致確認は、k8s `v1.35.0` 以降サポートしていない可能性がある。
-  - CardAlert Controller は `DeviceTaintRule` の削除は行わず、障害解決などした際にユーザによる手動削除を期待している。
+  - 障害があると設定する GPU の UUID をもとに `ResourceSlice` の中から一致するデバイスを確認し、対象のデバイスを `DeviceSelector` に設定する。
+  - CardAlert Controller は障害が解決しても `DeviceTaintRule` の削除は行わず、障害解決後にユーザによる手動削除を期待している。
 
 
 ### CardAlert AlertReceiver
@@ -330,21 +324,22 @@ cd /path/to/scale-controller
 ```
 
 ### 確認済環境
-- k8s: v1.34.2 (Management Cluster + Workload Cluster)
-- cluster-api: v1.12.0 (v1beta2 contract)
+- k8s: v1.36.1 (Management Cluster + Workload Cluster)
+- cluster-api: v1.14.0 (v1beta2 contract)
 - cert-manager: v1.19.2
 - calico: n/a
 
 ### バージョン指定
 
 以下のシェル変数を適宜設定する。
+helm_chart_version, controller_img_tag, receiver_img_tag はhelmチャートに記載の情報を設定すること。
 
 ```sh
-cluster_api_version=v1.12.0
+cluster_api_version=v1.14.0
 cert_manager_version=v1.19.2
-helm_chart_version=v0.3.0
-controller_img_tag=0.3.0
-receiver_img_tag=0.3.0
+helm_chart_version=v0.3.9
+controller_img_tag=0.3.9
+receiver_img_tag=0.3.9
 ```
 
 #### Management Cluster および Workload Cluster のセットアップ
@@ -359,16 +354,16 @@ export M_CLUSTER_NAME="fake-management"
 export CLUSTER_NAME="fake-cluster"
 # If you are in a proxy environment, run the following as needed
 export NO_PROXY=$NO_PROXY,172.18.0.0/16
-kind_image=kindest/node:v1.34.2
+kind_image=kindest/node:v1.36.1
 
 # Create Management Cluster using kind
 # If you do not need to specify the k8s image, the --image option is not required.
 kind create cluster -n ${M_CLUSTER_NAME} --image=${kind_image}
 
 # Deploy the Cluster API CRDs (Custom Resource Definitions) on the Management Cluster.
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/config/crd/bases/cluster.x-k8s.io_machinesets.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/config/crd/bases/cluster.x-k8s.io_machines.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machinedeployments.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machinesets.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/cluster-api/refs/tags/${cluster_api_version}/core/config/crd/bases/cluster.x-k8s.io_machines.yaml
 
 # Deploy DCI Provider and Resource Pool Manager CRDs on the Management Cluster.
 path_to_capd=../cluster-api-provider-dci
@@ -411,15 +406,15 @@ kubectl patch dcimachine fake-worker-dci-machine-00 --type='json' -p="${patch_js
 kubectl get md fake-worker-md-00
 # expected results:
 # NAME                CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
-# fake-worker-md-00   fake-cluster               1                   1                                        3s    
+# fake-worker-md-00   fake-cluster               1                   1                                        2s    
 
 # Verify that OwnerReference is set for MachineSet and others
 kubectl get ms fake-worker-ms-00 -o jsonpath='{.metadata.ownerReferences}{"\n"}'
 # expected results:
-# [{"apiVersion":"cluster.x-k8s.io/v1beta2","blockOwnerDeletion":true,"controller":true,"kind":"MachineDeployment","name":"fake-worker-md-00","uid":"6973cc52-0ab5-41d1-add2-0e8dbf0c53ed"}]
+# [{"apiVersion":"cluster.x-k8s.io/v1beta2","blockOwnerDeletion":true,"controller":true,"kind":"MachineDeployment","name":"fake-worker-md-00","uid":"8c07d62d-6718-48e6-b3af-c975e86cfe5b"}]
 kubectl get dcimachine fake-worker-dci-machine-00 -o jsonpath='{.metadata.ownerReferences}{"\n"}'
 # expected results:
-# [{"apiVersion":"cluster.x-k8s.io/v1beta2","blockOwnerDeletion":true,"controller":true,"kind":"Machine","name":"fake-worker-machine-00","uid":"251ac098-c939-41c1-8998-20fe9d9c5431"}]
+# [{"apiVersion":"cluster.x-k8s.io/v1beta2","blockOwnerDeletion":true,"controller":true,"kind":"Machine","name":"fake-worker-machine-00","uid":"cfec50d7-0d61-4c34-8671-c8b28f15541d"}]
 ```
 
 **Note**: 期待したディレクトリに DCI 独自プロバイダ、リソースプール管理の CRD ファイルが存在しない場合は以下の通り生成する。
@@ -443,7 +438,7 @@ envsubst < example/cluster-api/fake/workload/cluster.yaml | kw apply -f -
 kw get node
 # expected results:
 # NAME                         STATUS     ROLES           AGE   VERSION
-# fake-cluster-control-plane   NotReady   control-plane   7s    v1.34.2
+# fake-cluster-control-plane   NotReady   control-plane   8s    v1.36.1
 # fake-node-00                 Unknown    <none>          0s    
 # fake-node-control-plane-00   Unknown    <none>          0s    
 ```
@@ -472,17 +467,17 @@ Scale Controller をデプロイするには、事前に次の用意が必要。
 #    そうでない場合は --kube-context 、 --kubeconfig オプションを追加するなど調整のこと。
 cluster_context="--kube-context=kind-${CLUSTER_NAME}"
 path_to_helm_chart=dist/chart/
-controller_image_tag=${controller_img_tag}
-receiver_image_tag=${receiver_img_tag}
+helm_controller_image_tag=${controller_img_tag}
+helm_receiver_image_tag=${receiver_img_tag}
 path_to_management_kubeconfig=management.kubeconfig
 helm install scale-controller ${path_to_helm_chart} \
     ${cluster_context} \
     --create-namespace \
     --namespace scale-controller-system \
-    --set controllerManager.container.image.repository=scale-controller \
-    --set controllerManager.container.image.tag=${controller_image_tag} \
+    --set manager.image.repository=scale-controller \
+    --set manager.image.tag=${helm_controller_image_tag} \
     --set alertReceiver.container.image.repository=card-alert-receiver \
-    --set alertReceiver.container.image.tag=${receiver_image_tag} \
+    --set alertReceiver.container.image.tag=${helm_receiver_image_tag} \
     --set-file managementKubeconfig=${path_to_management_kubeconfig}
 ```
 
@@ -502,17 +497,17 @@ make helmchart
 #    そうでない場合は --kube-context 、 --kubeconfig オプションを追加するなど調整のこと。
 cluster_context="--kube-context=kind-${CLUSTER_NAME}"
 path_to_helm_chart=dist/scale-controller-${helm_chart_version}.tgz
-controller_image_tag=${controller_img_tag}
-receiver_image_tag=${receiver_img_tag}
+helm_controller_image_tag=${controller_img_tag}
+helm_receiver_image_tag=${receiver_img_tag}
 path_to_management_kubeconfig=management.kubeconfig
 helm install scale-controller ${path_to_helm_chart} \
     ${cluster_context} \
     --create-namespace \
     --namespace scale-controller-system \
-    --set controllerManager.container.image.repository=scale-controller \
-    --set controllerManager.container.image.tag=${controller_image_tag} \
+    --set manager.image.repository=scale-controller \
+    --set manager.image.tag=${helm_controller_image_tag} \
     --set alertReceiver.container.image.repository=card-alert-receiver \
-    --set alertReceiver.container.image.tag=${receiver_image_tag} \
+    --set alertReceiver.container.image.tag=${helm_receiver_image_tag} \
     --set-file managementKubeconfig=${path_to_management_kubeconfig}
 ```
 
@@ -541,10 +536,10 @@ Webhook 用の証明書を発行する cert-manager をデプロイし、その 
 kw apply -f https://github.com/cert-manager/cert-manager/releases/download/${cert_manager_version}/cert-manager.yaml
 kw get pod -n cert-manager
 # expected results:
-# NAME                                      READY   STATUS    RESTARTS   AGE
-# cert-manager-79559475b4-sv574             1/1     Running   0          19s
-# cert-manager-cainjector-966fc8fbc-5nxh6   1/1     Running   0          19s
-# cert-manager-webhook-854cf5f458-4h9ss     1/1     Running   0          19s
+# NAME                                       READY   STATUS    RESTARTS   AGE
+# cert-manager-56cbc66766-5rmnk              1/1     Running   0          20s
+# cert-manager-cainjector-7cf74f998f-kf66j   1/1     Running   0          20s
+# cert-manager-webhook-77d44c5f9b-29rkz      1/1     Running   0          20s
 ```
 
 #### Scale Controller のビルド
@@ -561,11 +556,11 @@ make docker-build
 docker images ${IMG}
 # expected results:
 # IMAGE                    ID             DISK USAGE   CONTENT SIZE   EXTRA
-# scale-controller:0.3.0   a69fe6e286de       82.4MB             0B        
+# scale-controller:0.3.9   24d68e75516c       78.7MB             0B      
 docker images ${ALERT_RECEIVER_IMG}
 # expected results:
 # IMAGE                       ID             DISK USAGE   CONTENT SIZE   EXTRA
-# card-alert-receiver:0.3.0   7a46ede9b1d8       43.6MB             0B
+# card-alert-receiver:0.3.9   44cc585a4a98       40.6MB             0B        
 ```
 
 ```sh
@@ -581,7 +576,7 @@ docker の代わりに buildah でイメージをビルドしたい場合は、 
 Management Cluster に Scale Controller 用の認証情報を設定する。
 
 ```sh
-kubectl apply -f example/rbac/rbac-in-management-cluster.yaml
+kubectl apply -f example/rbac/dci/rbac-in-management-cluster.yaml
 ```
 
 作成した認証情報から Scale Controller が Management Cluster にアクセスするための kubeconfig を作成する。
@@ -671,10 +666,10 @@ kubectl get md,dcimachinetemplate
 kw get node
 # expected results:
 # NAME                         STATUS     ROLES           AGE     VERSION
-# fake-cluster-control-plane   Ready      control-plane   6m      v1.34.2
-# fake-node-00                 NotReady   <none>          5m53s   
-# fake-node-01                 Unknown    <none>          22s     
-# fake-node-control-plane-00   NotReady   <none>          5m53s   
+# fake-cluster-control-plane   Ready      control-plane   8m11s   v1.36.1
+# fake-node-00                 NotReady   <none>          8m3s    
+# fake-node-01                 Unknown    <none>          35s     
+# fake-node-control-plane-00   NotReady   <none>          8m3s    
 ```
 
 `NodeScalingRequest` を削除する。
@@ -707,10 +702,10 @@ kw get nsr
 kubectl get md,ms
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE     VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   2                                        7m54s   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   2                                        9m44s   
 
 # NAME                                            CLUSTER        DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   AGE     VERSION
-# machineset.cluster.x-k8s.io/fake-worker-ms-00   fake-cluster   1                                                    7m52s   v1.34.2
+# machineset.cluster.x-k8s.io/fake-worker-ms-00   fake-cluster   1                                                    9m44s   v1.36.1
 ```
 
 Cluster API の動作をシミュレーションするため、ダミーの `Node` を手動で削除し、`machinedeployment.status.readyReplicas` を 1 に変更する。
@@ -726,7 +721,7 @@ kubectl patch md ${MD_NAME} --type=merge --patch '{"status": {"readyReplicas": 1
 kw get nsr
 # expected results:
 # NAME         TYPE     PHASE     AGE
-# scale-down   delete   Deleted   61s
+# scale-down   delete   Deleted   112s
 ```
 
 `machinedeployment.spec.replicas` および `machinedeployment.status.readyReplicas` が 1 に減少したことを確認する。
@@ -734,11 +729,11 @@ kw get nsr
 ```sh
 kubectl get md,dcimachinetemplate
 # expected results:
-# NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE     VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        9m18s   
+# NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        11m   
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   9m16s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   12m
 ```
 
 `Node` が削除されたことを確認する。
@@ -746,10 +741,10 @@ kubectl get md,dcimachinetemplate
 ```sh
 kw get node
 # expected results:
-# NAME                         STATUS     ROLES           AGE     VERSION
-# fake-cluster-control-plane   Ready      control-plane   7m3s    v1.34.2
-# fake-node-00                 NotReady   <none>          6m56s   
-# fake-node-control-plane-00   NotReady   <none>          6m56s   
+# NAME                         STATUS     ROLES           AGE   VERSION
+# fake-cluster-control-plane   Ready      control-plane   11m   v1.36.1
+# fake-node-00                 NotReady   <none>          11m   
+# fake-node-control-plane-00   NotReady   <none>          11m   
 ```
 
 `NodeScalingRequest` を削除する。
@@ -781,12 +776,12 @@ kw get nsr
 kubectl get md,dcimachinetemplate
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        10m   
-# machinedeployment.cluster.x-k8s.io/worker-md-uw350     fake-cluster               1                                                            11s   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        12m   
+# machinedeployment.cluster.x-k8s.io/worker-md-00evb     fake-cluster               1                                                            10s   
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   10m
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-mk55f           12s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-37os8           10s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   13m
 ```
 
 新たに作成された `DCIMachineTemplate` の `.spec.template.spec` が、 `NodeScalingRequest` の `spec` と一致することを確認する。
@@ -802,7 +797,7 @@ compare_string() {
     echo $2
   fi
 }
-export INFRA_TEMPLATE_NAME=worker-dmt-mk55f # 環境に合わせる
+export INFRA_TEMPLATE_NAME=worker-dmt-37os8 # 環境に合わせる
 compare_string \
   $(kubectl get dcimachinetemplate ${INFRA_TEMPLATE_NAME} -o jsonpath='{.spec.template.spec.serverSpec}') \
   $(kw get nsr scale-up-new-md -o jsonpath='{.spec.serverSpec}')
@@ -818,7 +813,7 @@ compare_string \
 また、新たに作成された `MachineDeployment` の `.spec.template.spec.infrastructureRef` に、新たに作成された `DCIMachineTemplate` の名前が設定されていることを確認する。
 
 ```sh
-export MD_NAME=worker-md-uw350　# 環境に合わせる
+export MD_NAME=worker-md-00evb # 環境に合わせる
 compare_string \
   $(kubectl get md ${MD_NAME} -o jsonpath='{.spec.template.spec.infrastructureRef.name}') \
   ${INFRA_TEMPLATE_NAME}
@@ -868,7 +863,7 @@ envsubst < example/cluster-api/fake/workload/resources-scaleup-new.yaml | kw app
 kw get nsr
 # expected results:
 # NAME              TYPE     PHASE     AGE
-# scale-up-new-md   create   Created   5m20s
+# scale-up-new-md   create   Created   2m32s
 ```
 
 `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` が 1 であることを確認する.
@@ -877,12 +872,12 @@ kw get nsr
 kubectl get md,dcimachinetemplate
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE     VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        14m     
-# machinedeployment.cluster.x-k8s.io/worker-md-uw350     fake-cluster               1                   1                                        3m49s   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        15m     
+# machinedeployment.cluster.x-k8s.io/worker-md-00evb     fake-cluster               1                   1                                        2m47s   
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   14m
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-mk55f           3m50s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-37os8           2m47s
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   16m
 ```
 
 `Node` が追加されたことを確認する。
@@ -890,11 +885,11 @@ kubectl get md,dcimachinetemplate
 ```sh
 kw get node
 # expected results:
-# NAME                         STATUS     ROLES           AGE     VERSION
-# fake-cluster-control-plane   Ready      control-plane   9m45s   v1.34.2
-# fake-node-00                 NotReady   <none>          9m38s   
-# fake-node-02                 NotReady   <none>          66s     
-# fake-node-control-plane-00   NotReady   <none>          9m38s   
+# NAME                         STATUS     ROLES           AGE   VERSION
+# fake-cluster-control-plane   Ready      control-plane   15m   v1.36.1
+# fake-node-00                 NotReady   <none>          15m   
+# fake-node-02                 Unknown    <none>          38s   
+# fake-node-control-plane-00   NotReady   <none>          15m   
 ```
 
 `NodeScalingRequest` を削除する。
@@ -928,13 +923,13 @@ kw get nsr
 kubectl get md,ms,dcimachinetemplate
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        15m   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        17m   
 
 # NAME                                            CLUSTER        DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   AGE   VERSION
-# machineset.cluster.x-k8s.io/fake-worker-ms-00   fake-cluster   1                                                    15m   v1.34.2
+# machineset.cluster.x-k8s.io/fake-worker-ms-00   fake-cluster   1                                                    17m   v1.36.1
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   15m
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   18m
 ```
 
 Cluster API の動作をシミュレーションするため、ダミーの `Machine` および `Node` を手動で削除する。
@@ -950,7 +945,7 @@ kw delete node fake-node-02
 kw get nsr
 # expected results:
 # NAME         TYPE     PHASE     AGE
-# scale-down   delete   Deleted   98s
+# scale-down   delete   Deleted   46s
 ```
 
 `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` が削除されたことを確認する。
@@ -959,10 +954,10 @@ kw get nsr
 kubectl get md,dcimachinetemplate
 # expected results:
 # NAME                                                   CLUSTER        AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE   AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        16m   
+# machinedeployment.cluster.x-k8s.io/fake-worker-md-00   fake-cluster               1                   1                                        18m   
 
 # NAME                                                                          AGE
-# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   16m
+# dcimachinetemplate.infrastructure.cluster.x-k8s.io/worker-dmt-dc1-cots-g1n1   19m
 ```
 
 `Node` が削除されたことを確認する。
@@ -971,9 +966,9 @@ kubectl get md,dcimachinetemplate
 kw get node
 # expected results:
 # NAME                         STATUS     ROLES           AGE   VERSION
-# fake-cluster-control-plane   Ready      control-plane   10m   v1.34.2
-# fake-node-00                 NotReady   <none>          10m   
-# fake-node-control-plane-00   NotReady   <none>          10m   
+# fake-cluster-control-plane   Ready      control-plane   17m   v1.36.1
+# fake-node-00                 NotReady   <none>          17m   
+# fake-node-control-plane-00   NotReady   <none>          17m   
 ```
 
 `NodeScalingRequest` を削除する。

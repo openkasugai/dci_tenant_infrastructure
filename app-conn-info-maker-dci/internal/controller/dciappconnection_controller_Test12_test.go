@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -96,7 +82,7 @@ func dciappconnection_controller_Test12_1(writer bytes.Buffer, reconciler DCIApp
 	} else {
 		fmt.Println("Success to get PodCR FromX1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR FromX1.")
@@ -105,8 +91,8 @@ func dciappconnection_controller_Test12_1(writer bytes.Buffer, reconciler DCIApp
 	Expect(err).NotTo(HaveOccurred())
 
 	// Create DCIAppConnectionCR
-	stDCIAppConnectionCR := DCIAppConnection12
-	err = k8sClient.Create(ctx, &stDCIAppConnectionCR)
+	pstDCIAppConnectionCR := DCIAppConnection12.DeepCopy()
+	err = k8sClient.Create(ctx, pstDCIAppConnectionCR)
 	if err != nil {
 		fmt.Println("There is a problem in createing DCIAppConnection12")
 		fmt.Println(err)
@@ -128,13 +114,12 @@ func dciappconnection_controller_Test12_1(writer bytes.Buffer, reconciler DCIApp
 	Expect(got).To(Equal(ctrl.Result{Requeue: false}))
 	Expect(got).To(Equal(ctrl.Result{RequeueAfter: 0}))
 
-	var stDCIAppConnCR examplecomv1.DCIAppConnection
 	err = k8sClient.Get(ctx,
 		client.ObjectKey{
 			Name:      cDCIAppConnection01Name,
 			Namespace: cDCIAppConnectionNamespace,
 		},
-		&stDCIAppConnCR)
+		pstDCIAppConnectionCR)
 	if err != nil {
 		fmt.Println("Failed to get DCIAppConnectionCR.")
 		fmt.Println(err)
@@ -142,9 +127,12 @@ func dciappconnection_controller_Test12_1(writer bytes.Buffer, reconciler DCIApp
 		fmt.Println("Success to get DCIAppConnectionCR.")
 	}
 	Expect(err).NotTo(HaveOccurred())
-	Expect(stDCIAppConnCR.Finalizers).NotTo(BeEmpty())
-	Expect(stDCIAppConnCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
-	Expect(stDCIAppConnCR.Status).To(Equal(DCIAppConnection01Status))
+	Expect(pstDCIAppConnectionCR.Finalizers).NotTo(BeEmpty())
+	Expect(pstDCIAppConnectionCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(pstDCIAppConnectionCR.Status.Phase).To(Equal(DCIAppConnection12Status.Phase))
+	Expect(pstDCIAppConnectionCR.Status.Connections).To(Equal(DCIAppConnection12Status.Connections))
+	Expect(pstDCIAppConnectionCR.Status.InputEndpoints).To(Equal(DCIAppConnection12Status.InputEndpoints))
+	Expect(pstDCIAppConnectionCR.Status.OutputEndpoints).To(Equal(DCIAppConnection12Status.OutputEndpoints))
 
 	var stConnectEndpointCR examplecomv1.ConnectEndpoint
 	err = k8sClient.Get(ctx,
@@ -294,7 +282,7 @@ func dciappconnection_controller_Test12_2(writer bytes.Buffer, reconciler DCIApp
 	} else {
 		fmt.Println("Success to get PodCR FromX1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR FromX1.")

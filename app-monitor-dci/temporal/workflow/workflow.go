@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
@@ -34,7 +20,7 @@ type MonitorWorkflowState struct {
 const VectorSignalName = "vector-signal"
 const AlertmanagerSignalName = "alertmanager-signal"
 
-const DefaultHistoryEventThreshold = 25000
+const DefaultHistoryEventThreshold = 10000
 
 func loadHistoryEventThreshold() int {
 	val := os.Getenv("HISTORY_EVENT_THRESHOLD")
@@ -56,11 +42,10 @@ var HistoryEventThreshold = loadHistoryEventThreshold()
 var (
 	vectorSignalActivityFn       = VectorSignalActivity
 	alertManagerSignalActivityFn = AlertManagerSignalActivity
-	keepAliveInterval            = time.Minute
 	currentHistoryLengthFn       = func(ctx workflow.Context) int {
 		return int(workflow.GetInfo(ctx).GetCurrentHistoryLength())
 	}
-	setQueryHandlerFn = func(ctx workflow.Context, queryType string, handler interface{}) error {
+	setQueryHandlerFn = func(ctx workflow.Context, queryType string, handler any) error {
 		return workflow.SetQueryHandler(ctx, queryType, handler)
 	}
 )
@@ -108,19 +93,6 @@ func MonitorWorkflow(ctx workflow.Context, initialState *MonitorWorkflowState) e
 	ctx = workflow.WithActivityOptions(ctx, ao)
 	logger.Info("MonitorWorkflow started(with activity), waiting for signals...")
 	klog.Info("MonitorWorkflow started(with activity), waiting for signals...")
-
-	// Periodic "still alive" log in a separate coroutine to avoid timer accumulation in selector
-	if keepAliveInterval > 0 {
-		workflow.Go(ctx, func(ctx workflow.Context) {
-			for {
-				if err := workflow.Sleep(ctx, keepAliveInterval); err != nil {
-					return
-				}
-				logger.Info("still alive...")
-				klog.Info("still alive...")
-			}
-		})
-	}
 
 	// Main event loop
 	for {

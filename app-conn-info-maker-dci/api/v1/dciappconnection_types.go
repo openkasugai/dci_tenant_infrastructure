@@ -1,21 +1,8 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -25,11 +12,12 @@ import (
 type DCIAppConnectionSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	Connections []Connection `json:"connections"`
 	// +optional
-	InputEndpoint *DCIAppConnectionExternalEndpoint `json:"inputEndpoint,omitempty"`
+	Connections []Connection `json:"connections,omitempty"`
 	// +optional
-	OutputEndpoint *DCIAppConnectionExternalEndpoint `json:"outputEndpoint,omitempty"`
+	InputEndpoints []DCIAppConnectionExternalEndpoint `json:"inputEndpoints,omitempty"`
+	// +optional
+	OutputEndpoints []DCIAppConnectionExternalEndpoint `json:"outputEndpoints,omitempty"`
 }
 
 // Connection defines the desired state of DCIAppConnectionSpec.
@@ -71,6 +59,12 @@ type DCIAppConnectionStatus struct {
 	// +kubebuilder:validation:Enum="Created";"Pending";"Failed";""
 	// +default:phase=""
 	Phase string `json:"phase"`
+	// +optional
+	Connections []Connection `json:"connections,omitempty"`
+	// +optional
+	InputEndpoints []DCIAppConnectionExternalEndpoint `json:"inputEndpoints,omitempty"`
+	// +optional
+	OutputEndpoints []DCIAppConnectionExternalEndpoint `json:"outputEndpoints,omitempty"`
 }
 
 const (
@@ -86,11 +80,19 @@ const (
 
 // DCIAppConnection is the Schema for the dciappconnections API.
 type DCIAppConnection struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   DCIAppConnectionSpec   `json:"spec,omitempty"`
-	Status DCIAppConnectionStatus `json:"status,omitempty"`
+	// metadata is a standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitzero"`
+
+	// spec defines the desired state of DCIAppConnection
+	// +required
+	Spec DCIAppConnectionSpec `json:"spec"`
+
+	// status defines the observed state of DCIAppConnection
+	// +optional
+	Status DCIAppConnectionStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true
@@ -98,10 +100,13 @@ type DCIAppConnection struct {
 // DCIAppConnectionList contains a list of DCIAppConnection.
 type DCIAppConnectionList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitzero"`
 	Items           []DCIAppConnection `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&DCIAppConnection{}, &DCIAppConnectionList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &DCIAppConnection{}, &DCIAppConnectionList{})
+		return nil
+	})
 }

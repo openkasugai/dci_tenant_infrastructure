@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package v1alpha1
 
 import (
@@ -20,13 +6,12 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	scalev1 "scale-controller/api/v1alpha1"
@@ -43,27 +28,27 @@ type NodeScalingRequestCustomValidator struct {
 	ClientHelper helperclient.ClientHelper
 }
 
-var _ webhook.CustomValidator = &NodeScalingRequestCustomValidator{}
+var _ admission.Validator[*scalev1.NodeScalingRequest] = &NodeScalingRequestCustomValidator{}
+
+// NewNodeScalingRequestWebhookManagedBy is a variable to allow for easier testing of the webhook registration.
+// It can be overridden in tests to provide a mock implementation.
+var NewNodeScalingRequestWebhookManagedBy = func(mgr ctrl.Manager) *builder.WebhookBuilder[*scalev1.NodeScalingRequest] {
+	return ctrl.NewWebhookManagedBy(mgr, &scalev1.NodeScalingRequest{})
+}
 
 // SetupWithManager registers the webhook for NodeScalingRequest in the manager.
 func (v *NodeScalingRequestCustomValidator) SetupWithManager(
 	mgr ctrl.Manager,
 ) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(&scalev1.NodeScalingRequest{}).
+	return NewNodeScalingRequestWebhookManagedBy(mgr).
 		WithValidator(v).
 		Complete()
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type NodeScalingRequest.
 func (v *NodeScalingRequestCustomValidator) ValidateCreate(
-	ctx context.Context, obj runtime.Object,
+	ctx context.Context, nsr *scalev1.NodeScalingRequest,
 ) (admission.Warnings, error) {
-	nsr, ok := obj.(*scalev1.NodeScalingRequest)
-	if !ok {
-		// This case is only for failsafe
-		return nil, fmt.Errorf("expected a NodeScalingRequest object but got %T", obj)
-	}
 	if nsr == nil {
 		// This case is only for failsafe
 		return nil, errors.New("expected a NodeScalingRequest is not nil, but got nil")
@@ -92,11 +77,10 @@ func (v *NodeScalingRequestCustomValidator) ValidateCreate(
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type NodeScalingRequest.
 func (*NodeScalingRequestCustomValidator) ValidateUpdate(
-	ctx context.Context, _, newObj runtime.Object,
+	ctx context.Context, _, newNsr *scalev1.NodeScalingRequest,
 ) (admission.Warnings, error) {
-	_, ok := newObj.(*scalev1.NodeScalingRequest)
-	if !ok {
-		return nil, fmt.Errorf("expected a NodeScalingRequest object for the newObj but got %T", newObj)
+	if newNsr == nil {
+		return nil, fmt.Errorf("expected a NodeScalingRequest object for the newObj but got nil")
 	}
 
 	logger := log.FromContext(ctx).WithName("nodescalingrequest-validator")
@@ -109,11 +93,10 @@ func (*NodeScalingRequestCustomValidator) ValidateUpdate(
 // This function will never be called because we set the webhook to ignore delete operations in the kubebuilder marker.
 // However, we implement this method to satisfy the webhook.CustomValidator interface.
 func (*NodeScalingRequestCustomValidator) ValidateDelete(
-	ctx context.Context, obj runtime.Object,
+	ctx context.Context, nsr *scalev1.NodeScalingRequest,
 ) (admission.Warnings, error) {
-	_, ok := obj.(*scalev1.NodeScalingRequest)
-	if !ok {
-		return nil, fmt.Errorf("expected a NodeScalingRequest object but got %T", obj)
+	if nsr == nil {
+		return nil, fmt.Errorf("expected a NodeScalingRequest object but got nil")
 	}
 
 	logger := log.FromContext(ctx).WithName("nodescalingrequest-validator")

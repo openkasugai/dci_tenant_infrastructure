@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: connectendpoints.example.com
 spec:
   group: example.com
@@ -44,7 +44,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ConnectEndpointSpec defines the desired state of ConnectEndpoint.
+            description: spec defines the desired state of ConnectEndpoint
             properties:
               from:
                 description: |-
@@ -181,7 +181,7 @@ spec:
             - from
             type: object
           status:
-            description: ConnectEndpointStatus defines the observed state of ConnectEndpoint.
+            description: status defines the observed state of ConnectEndpoint
             properties:
               condition:
                 description: |-
@@ -325,6 +325,8 @@ spec:
             - condition
             - from
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

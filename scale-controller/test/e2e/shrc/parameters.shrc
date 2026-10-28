@@ -58,11 +58,13 @@ is_exec_cleanup_workload_cluster="true"
 is_exec_cleanup_management_cluster="true"
 
 # version of kind image to be installed
-kind_image_version="v1.34.2"
+kind_image_version="v1.36.1"
 # version of calico to be installed
 calico_version="v3.31.2"
 # version of cert-manager to be installed
 cert_manager_version="v1.19.2"
+# version of cluster-api to be installed
+cluster_api_version="v1.14.0"
 
 # global variables(not set value here, set value in each setup function)
 KUBECTL_M="" ## kubectl for management cluster

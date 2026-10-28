@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
@@ -49,7 +35,7 @@ type PrometheusResponse struct {
 		ResultType string `json:"resultType"`
 		Result     []struct {
 			Metric map[string]string `json:"metric"`
-			Value  []interface{}     `json:"value"`
+			Value  []any             `json:"value"`
 		} `json:"result"`
 	} `json:"data"`
 }
@@ -641,13 +627,13 @@ func ExactPrometheusValue(body []byte) (string, error) {
 	// Unmarshal the JSON response body into the 'resp' struct.
 	// If unmarshaling fails, return an error.
 	if err := json.Unmarshal(body, &resp); err != nil {
-		return "", fmt.Errorf("faild to unmarshal: %w", err)
+		return "", fmt.Errorf("failed to unmarshal: %w", err)
 	}
 
 	// Check if the response status indicates success.
 	// If not, return an error with the reported status.
 	if resp.Status != "success" {
-		return "", fmt.Errorf("query faild, status: %s", resp.Status)
+		return "", fmt.Errorf("query failed, status: %s", resp.Status)
 	}
 
 	if len(resp.Data.Result) == 0 || len(resp.Data.Result[0].Value) < 2 {

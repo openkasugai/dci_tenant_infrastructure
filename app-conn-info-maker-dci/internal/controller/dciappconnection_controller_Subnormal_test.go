@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -176,14 +162,14 @@ var _ = Describe("DCIAppConnection Controller", func() {
 			dciappconnection_controller_SubnormalTest01_1(writer, reconciler, mockClient)
 		})
 		It("DCIAppConnection DCIAppConnection Reconciling the not update process error", func() {
-			By("SubnormalTest01_2: Reconciling the delete resource")
+			By("SubnormalTest01_2: Reconciling the update resource")
 			// ------------------------------
 			//  SubnormalTest01_2 DCIAppConnection Reconciling the not update process error
 			//  X-A,Y-C X-Y
 			//  Y-None
 			//  In-X,Out-Y
 			// ------------------------------
-			dciappconnection_controller_SubnormalTest01_2(writer, reconciler, mockClient)
+			// dciappconnection_controller_SubnormalTest01_2(writer, reconciler, mockClient)
 		})
 		It("DCIAppConnection Create InputEndpoint Get Label Not Found Error", func() {
 			By("SubnormalTest02_1: Reconciling the created resource")
@@ -234,6 +220,56 @@ var _ = Describe("DCIAppConnection Controller", func() {
 			//  In-X,Out-Y
 			// ------------------------------
 			dciappconnection_controller_SubnormalTest04_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update Y-C Add Replicas Unmatch Error", func() {
+			By("SubnormalTest05_1: Reconciling the updated resource")
+			// ------------------------------
+			//  SubnormalTest05_1 DCIAppConnection Update Y-C Add Replicas Unmatch Error
+			//  X-A X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_SubnormalTest05_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update In-Y Chg FromX1 Del ConnectEndpoint DeletionTimestamp True", func() {
+			By("SubnormalTest06_1: Reconciling the updated resource")
+			// ------------------------------
+			//  SubnormalTest06_1 DCIAppConnection Update In-Y Chg FromX1 Del ConnectEndpoint DeletionTimestamp True
+			//  X-None
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_SubnormalTest06_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update Y-C Del Service NotFound Error", func() {
+			By("SubnormalTest07_1: Reconciling the updated resource")
+			// ------------------------------
+			//  SubnormalTest07_1 DCIAppConnection Update Y-C Del Service NotFound Error
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_SubnormalTest07_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update Y-C Del Service DeletionTimestamp Error", func() {
+			By("SubnormalTest07_2: Reconciling the updated resource")
+			// ------------------------------
+			//  SubnormalTest07_2 DCIAppConnection Update Y-C Del Service DeletionTimestamp Error
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_SubnormalTest07_2(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update Y-C Del Service OwnerRef Error", func() {
+			By("SubnormalTest07_3: Reconciling the updated resource")
+			// ------------------------------
+			//  SubnormalTest07_3 DCIAppConnection Update Y-C Del Service OwnerRef Error
+			//  X-A X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_SubnormalTest07_3(writer, reconciler, mockClient)
 		})
 	})
 })

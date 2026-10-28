@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package v1
 
 import (
@@ -33,9 +19,26 @@ type FromPodInfo struct {
 	ConnectEndpointCR *ConnectEndpoint
 	Address           string
 	DeploymentIndexs  []int
+	InputSubsets      []string
+	OutputSubsets     []string
 	IOMode            int
 	MstPodFlag        bool
 	DeleteFlag        bool
+}
+
+// FromDeploymentInfos defines the desired state of getStatusRelationship.
+type FromDeploymentInfos struct {
+	FromDeployments []FromDeploymentInfo
+}
+
+type FromDeploymentInfo struct {
+	DeploymentRef    types.NamespacedName
+	DeploymentR      *appsv1.Deployment
+	DeploymentIndexs []int
+	InputSubsets     []string
+	OutputSubsets    []string
+	IOMode           int
+	DeleteFlag       bool
 }
 
 const (
@@ -62,6 +65,16 @@ type ToPodInfo struct {
 	PodR       *corev1.Pod
 	Address    string
 	DeleteFlag bool
+}
+
+// ToDeploymentInfos defines the desired state of GetToConnectionInformation.
+type ToDeploymentInfos struct {
+	ToDeploymentInfos map[int]ToDeployments
+}
+
+type ToDeployments struct {
+	DeploymentRef types.NamespacedName
+	DeleteFlag    bool
 }
 
 type NetworkStatus struct {

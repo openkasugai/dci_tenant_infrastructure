@@ -38,7 +38,7 @@ spec:
       labels:
         cluster.x-k8s.io/cluster-name: dummy-cluster-not-used
     spec:
-      version: v1.34.2
+      version: v1.36.1
       clusterName: dummy-cluster-not-used
       bootstrap:
         configRef:

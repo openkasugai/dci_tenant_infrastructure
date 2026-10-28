@@ -1,8 +1,8 @@
-FROM docker.io/golang:1.25 AS builder
+FROM docker.io/golang:1.26.2 AS builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
-RUN go mod edit -go=1.25 && grep '^go ' go.mod
+RUN go mod edit -go=1.26.2 && grep '^go ' go.mod
 
 # Clean module cache to ensure fresh download
 RUN go clean -modcache

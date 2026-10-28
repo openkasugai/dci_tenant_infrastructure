@@ -4,7 +4,7 @@ networking:
   ipFamily: dual
 nodes:
 - role: control-plane
-  image: kindest/node:v1.34.2
+  image: kindest/node:v1.36.1
   extraMounts:
     - hostPath: /var/run/docker.sock
       containerPath: /var/run/docker.sock

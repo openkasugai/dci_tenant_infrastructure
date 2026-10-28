@@ -1,33 +1,20 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
 	"fmt"
-	"golang.org/x/time/rate"
-	"k8s.io/client-go/util/workqueue"
 	"os"
 	"reflect"
 	pkgrt "runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 	"unicode"
+
+	"golang.org/x/time/rate"
+	"k8s.io/client-go/util/workqueue"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -38,7 +25,7 @@ import (
 	examplecomv1 "app-conn-control-info-manager-dci/api/v1"
 )
 
-// writeFileFunc allows tests to override file write behaviour.
+// writeFileFunc allows tests to override file write behavior.
 var writeFileFunc = os.WriteFile
 
 // jsonMarshalFunc allows tests to override json.Marshal
@@ -62,6 +49,9 @@ func signalSend(p *os.Process, sig syscall.Signal) error {
 
 // jsonUnmarshalFunc allows tests to override json.Unmarshal.
 var jsonUnmarshalFunc = json.Unmarshal
+
+// runtimeCallerFunc allows tests to override runtime.Caller.
+var runtimeCallerFunc = pkgrt.Caller
 
 // findProcessFunc allows tests to override process lookup behavior.
 var FindProcessFunc = os.FindProcess
@@ -91,7 +81,10 @@ func NewCustomControllerOptions() controller.Options {
 }
 
 func getFuncName() string {
-	pc, _, _, _ := pkgrt.Caller(1)
+	pc, _, _, ok := runtimeCallerFunc(1)
+	if !ok {
+		return ""
+	}
 	cFuncName := pkgrt.FuncForPC(pc).Name()
 	idx := 0
 	iLastIdx := strings.LastIndex(cFuncName, ".")
@@ -117,7 +110,7 @@ func createPodConfig(
 	mstDestinationPod.Address = toPodStatus.Address
 
 	if len(toPodStatus.AppStatus.Raw) != 0 {
-		mapAppStatus := map[string]interface{}{}
+		mapAppStatus := map[string]any{}
 		err = jsonUnmarshalFunc(toPodStatus.AppStatus.Raw, &mapAppStatus)
 		if err == nil {
 			iVal := reflect.ValueOf(&mstDestinationPod).Elem()
@@ -168,6 +161,7 @@ func createConfigFile(
 		var jsonData []byte
 
 		fileData.Address = pstCRData.Status.From.FromPod.Address
+		fileData.Services = []examplecomv1.Service{}
 
 		if examplecomv1.Delete != eventKind {
 			if pstCRData.Status.InputEndpoint != nil {
@@ -181,6 +175,7 @@ func createConfigFile(
 			for _, to := range pstCRData.Status.To {
 				var stService examplecomv1.Service
 				stService.Label = to.DeploymentRef.Name
+				stService.Destinations = []examplecomv1.Destination{}
 				for _, toPodStatus := range to.ToPod {
 					var mstDestinationPod examplecomv1.Destination
 					mstDestinationPod, err = createPodConfig(log, &toPodStatus)

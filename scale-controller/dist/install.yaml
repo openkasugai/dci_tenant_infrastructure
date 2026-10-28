@@ -1,0 +1,1586 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+    control-plane: controller-manager
+  name: scale-controller-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: cardalerts.cluster.my.domain
+spec:
+  group: cluster.my.domain
+  names:
+    kind: CardAlert
+    listKind: CardAlertList
+    plural: cardalerts
+    shortNames:
+    - ca
+    singular: cardalert
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.nodeName
+      name: TargetNode
+      type: string
+    - jsonPath: .status.state
+      name: State
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CardAlert is the Schema for the cardalerts API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CardAlertSpec defines the desired state of CardAlert.
+            properties:
+              cards:
+                description: Cards defines the list of GPU cards that triggered the
+                  alert.
+                items:
+                  description: CardInfo defines information about a card like GPU.
+                  properties:
+                    gpuUUID:
+                      description: GPUUUID defines the UUID of the GPU card.
+                      minLength: 1
+                      type: string
+                    migUUIDs:
+                      description: MIGUUIDs defines the UUIDs of the MIG (Multi-Instance
+                        GPU) cards.
+                      items:
+                        type: string
+                      type: array
+                    model:
+                      description: Model defines the model of the card.
+                      minLength: 1
+                      type: string
+                  required:
+                  - gpuUUID
+                  type: object
+                minItems: 1
+                type: array
+              nodeName:
+                description: NodeName defines the name of the Node where the alert
+                  occurred.
+                minLength: 1
+                type: string
+              reason:
+                description: Reason defines the reason for the alert.
+                type: string
+              source:
+                description: Source defines the source of the alert.
+                enum:
+                - WebhookReceiverOnTenant
+                type: string
+            required:
+            - cards
+            - nodeName
+            - source
+            type: object
+            x-kubernetes-validations:
+            - message: '`spec` may not be modified after creation.'
+              rule: self == oldSelf
+          status:
+            description: CardAlertStatus defines the observed state of CardAlert.
+            properties:
+              cardModel:
+                description: CardModel defines the model of the card that triggered
+                  the alert in the status of LogicalServer.
+                type: string
+              completedTime:
+                description: CompletedTime defines the timestamp when the alert handling
+                  is completed.
+                format: date-time
+                type: string
+              logicalServerRef:
+                description: LogicalServerRef defines the reference to the LogicalServer
+                  associated with the Node.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              resourceRef:
+                description: ResourceRef defines the reference to the resource created
+                  for handling the alert, such as MachineAlert or Taint.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: |-
+                      If referring to a piece of an object instead of an entire object, this string
+                      should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                      For example, if the object reference is to a container within a pod, this would take on a value like:
+                      "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                      the event) or if no container name is specified "spec.containers[2]" (container with
+                      index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                      referencing a part of an object.
+                    type: string
+                  kind:
+                    description: |-
+                      Kind of the referent.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                    type: string
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                    type: string
+                  resourceVersion:
+                    description: |-
+                      Specific resourceVersion to which this reference is made, if any.
+                      More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                    type: string
+                  uid:
+                    description: |-
+                      UID of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              serverType:
+                description: ServerType defines the type of the LogicalServer.
+                enum:
+                - ComposedServer
+                - COTSServer
+                - VM
+                type: string
+              skipCards:
+                description: SkipCards defines the list of cards that are skipped
+                  for any reasons.
+                items:
+                  description: CardInfo defines information about a card like GPU.
+                  properties:
+                    gpuUUID:
+                      description: GPUUUID defines the UUID of the GPU card.
+                      minLength: 1
+                      type: string
+                    migUUIDs:
+                      description: MIGUUIDs defines the UUIDs of the MIG (Multi-Instance
+                        GPU) cards.
+                      items:
+                        type: string
+                      type: array
+                    model:
+                      description: Model defines the model of the card.
+                      minLength: 1
+                      type: string
+                  required:
+                  - gpuUUID
+                  type: object
+                type: array
+              state:
+                default: ""
+                description: State defines the state of the CardAlert.
+                enum:
+                - ""
+                - Initializing
+                - Pending
+                - CreatingReplaceResource
+                - WaitingCardScalingRequest
+                - WaitingMachineAlert
+                - DeletingMachineAlert
+                - CreatingTaintResource
+                - Completed
+                - Failed
+                - Finalized
+                type: string
+              targetCards:
+                description: TargetCards defines the list of the target cards.
+                items:
+                  description: CardInfo defines information about a card like GPU.
+                  properties:
+                    gpuUUID:
+                      description: GPUUUID defines the UUID of the GPU card.
+                      minLength: 1
+                      type: string
+                    migUUIDs:
+                      description: MIGUUIDs defines the UUIDs of the MIG (Multi-Instance
+                        GPU) cards.
+                      items:
+                        type: string
+                      type: array
+                    model:
+                      description: Model defines the model of the card.
+                      minLength: 1
+                      type: string
+                  required:
+                  - gpuUUID
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: cardscalingrequests.cluster.my.domain
+spec:
+  group: cluster.my.domain
+  names:
+    kind: CardScalingRequest
+    listKind: CardScalingRequestList
+    plural: cardscalingrequests
+    shortNames:
+    - csr
+    singular: cardscalingrequest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.nodeName
+      name: TargetNode
+      type: string
+    - jsonPath: .spec.scalingParameter.op
+      name: Operation
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CardScalingRequest is the Schema for the cardscalingrequests
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CardScalingRequestSpec defines the desired state of CardScalingRequest.
+            properties:
+              nodeName:
+                type: string
+              scalingParameter:
+                description: ScalingParameter defines the parameters for scaling a
+                  card.
+                properties:
+                  model:
+                    description: Model defines the model of the GPU card.
+                    type: string
+                  num:
+                    description: |-
+                      Num defines the number of GPU cards to be added or removed.
+                      When Num is set with "delete", UUIDs must not be set.
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  op:
+                    description: Op defines the operation to be performed.
+                    enum:
+                    - add
+                    - delete
+                    - replace
+                    type: string
+                  uuids:
+                    description: |-
+                      UUIDs defines the UUIDs of the GPU cards to be removed or replaced.
+                      When UUIDs is set with "delete", Num must not be set.
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                required:
+                - model
+                - op
+                type: object
+                x-kubernetes-validations:
+                - message: When op is 'add', only 'num' must be set.
+                  rule: self.op != 'add' || (has(self.num) && !has(self.uuids))
+                - message: When op is 'delete', either 'num' or 'uuids' must be set,
+                    but not both.
+                  rule: self.op != 'delete' || ((has(self.num) && !has(self.uuids))
+                    || (!has(self.num) && has(self.uuids)))
+                - message: When op is 'replace', only 'uuids' must be set.
+                  rule: self.op != 'replace' || (!has(self.num) && has(self.uuids))
+            required:
+            - nodeName
+            - scalingParameter
+            type: object
+            x-kubernetes-validations:
+            - message: '`spec` may not be modified after creation.'
+              rule: self == oldSelf
+          status:
+            description: CardScalingRequestStatus defines the observed state of CardScalingRequest.
+            properties:
+              clusterName:
+                description: ClusterName defines the name of the cluster where the
+                  node is located.
+                type: string
+              clusterNamespace:
+                description: ClusterNamespace defines the namespace of the cluster
+                  where the node is located.
+                type: string
+              lastTransitionTime:
+                description: LastTransitionTime is the last time the phase transitioned
+                  to the completed state.
+                format: date-time
+                type: string
+              newDCIMachineInfo:
+                description: NewDCIMachineInfo defines the DCI machine information
+                  after scaling.
+                properties:
+                  dciMachineName:
+                    type: string
+                  dciMachineTemplateName:
+                    type: string
+                  dciMachineTemplateUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                  dciMachineUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                  machineDeploymentName:
+                    type: string
+                  machineDeploymentUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                type: object
+              oldDCIMachineInfo:
+                description: OldDCIMachineInfo defines the DCI machine information
+                  before scaling.
+                properties:
+                  dciMachineName:
+                    type: string
+                  dciMachineTemplateName:
+                    type: string
+                  dciMachineTemplateUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                  dciMachineUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                  machineDeploymentName:
+                    type: string
+                  machineDeploymentUID:
+                    description: |-
+                      UID is a type that holds unique ID values, including UUIDs.  Because we
+                      don't ONLY use UUIDs, this is an alias to string.  Being a type captures
+                      intent and helps make sure that UIDs and names do not get conflated.
+                    type: string
+                type: object
+              phase:
+                description: Phase defines the current phase of the CardScalingRequest.
+                enum:
+                - ""
+                - CardScaleInitializing
+                - DCIMachineTemplateCreating
+                - MachineDeploymentCreating
+                - DCIMachineAnnotating
+                - CardScaleInitialized
+                - NodeScalingDown
+                - NodeScaleDownDeleting
+                - NodeScaleDownCompleted
+                - NodeScalingUp
+                - CardScaleCompleted
+                - NodeScaleDownFailed
+                - NodeScaleUpFailed
+                - DCIMachineTemplateCleanup
+                - MachineDeploymentCleanup
+                - DCIMachineCleanup
+                - CardScaleFinalized
+                - Pending
+                type: string
+            required:
+            - phase
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: nodescalingrequests.cluster.my.domain
+spec:
+  group: cluster.my.domain
+  names:
+    kind: NodeScalingRequest
+    listKind: NodeScalingRequestList
+    plural: nodescalingrequests
+    shortNames:
+    - nsr
+    singular: nodescalingrequest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.nodeRequestType
+      name: Type
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: NodeScalingRequest is the Schema for the nodescalingrequests
+          API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: NodeScalingRequestSpec defines the desired state of NodeScalingRequest.
+            properties:
+              location:
+                description: Location is the location for the logical server base
+                  (required for create requests).
+                type: string
+              node:
+                description: Node is the name of the node to delete (required for
+                  delete requests).
+                type: string
+              nodeRequestType:
+                description: NodeRequestType is the type of scaling request (create
+                  or delete).
+                enum:
+                - create
+                - delete
+                type: string
+              serverSpec:
+                description: ServerSpec contains information for creating a new node
+                  (required for create requests).
+                properties:
+                  gpu:
+                    description: Requested GPU information.
+                    properties:
+                      assignments:
+                        description: Assignments is the list of GPU assignments.
+                        items:
+                          properties:
+                            uuid:
+                              description: UUID is the UUID of GPU.
+                              type: string
+                          required:
+                          - uuid
+                          type: object
+                        type: array
+                        x-kubernetes-list-map-keys:
+                        - uuid
+                        x-kubernetes-list-type: map
+                      model:
+                        description: Model is the model name of GPU.(e.g, A100, H100,...)
+                        type: string
+                      num:
+                        description: Num is the number of GPUs.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                    required:
+                    - model
+                    - num
+                    type: object
+                    x-kubernetes-validations:
+                    - message: serverSpec.gpu.model field is immutable
+                      rule: self.model == oldSelf.model
+                  minCPU:
+                    description: Requested minimum CPU core num.
+                    format: int32
+                    maximum: 99999
+                    minimum: 1
+                    type: integer
+                    x-kubernetes-validations:
+                    - message: serverSpec.minCPU field is immutable
+                      rule: self == oldSelf
+                  minMemory:
+                    description: Requested minimum memory size (in MB).
+                    format: int32
+                    maximum: 99999999
+                    minimum: 1
+                    type: integer
+                    x-kubernetes-validations:
+                    - message: serverSpec.minMemory field is immutable
+                      rule: self == oldSelf
+                  minStorage:
+                    description: Requested minimum storage size (in GB).
+                    format: int32
+                    maximum: 960
+                    minimum: 1
+                    type: integer
+                    x-kubernetes-validations:
+                    - message: serverSpec.minStorage field is immutable
+                      rule: self == oldSelf
+                  nic:
+                    description: Requested NIC information.
+                    properties:
+                      model:
+                        description: Model is the model name of NIC.(e.g, MT2892,...)
+                        type: string
+                      num:
+                        description: Num is the number of NICs.
+                        format: int32
+                        maximum: 1
+                        minimum: 1
+                        type: integer
+                    required:
+                    - model
+                    - num
+                    type: object
+                    x-kubernetes-validations:
+                    - message: serverSpec.nic field is immutable
+                      rule: self == oldSelf
+                  os:
+                    description: Requested OS type.
+                    properties:
+                      distribution:
+                        description: Distribution is the name of OS distribution.(e.g,
+                          rhel, ubuntu,...)
+                        type: string
+                      version:
+                        description: Version is the version of OS.(e.g, 9.5, 24.04,...)
+                        type: string
+                    required:
+                    - distribution
+                    - version
+                    type: object
+                    x-kubernetes-validations:
+                    - message: serverSpec.os field is immutable
+                      rule: self == oldSelf
+                  type:
+                    description: Requested server type.
+                    enum:
+                    - ComposedServer
+                    - COTSServer
+                    - VM
+                    - ComposedServerOrCOTSServer
+                    type: string
+                    x-kubernetes-validations:
+                    - message: serverSpec.type field is immutable
+                      rule: self == oldSelf
+                required:
+                - type
+                type: object
+                x-kubernetes-validations:
+                - message: minCPU must be specified and greater than 0 when serverSpec.type
+                    is 'VM'
+                  rule: self.type != 'VM' || self.minCPU > 0
+                - message: minMemory must be specified and greater than 0 when serverSpec.type
+                    is 'VM'
+                  rule: self.type != 'VM' || self.minMemory > 0
+                - message: minStorage must be specified and greater than 0 when serverSpec.type
+                    is 'VM'
+                  rule: self.type != 'VM' || self.minStorage > 0
+            required:
+            - nodeRequestType
+            type: object
+            x-kubernetes-validations:
+            - message: nodeRequestType is create, but spec.node is set
+              rule: 'self.nodeRequestType == ''create'' ? !has(self.node) : true'
+            - message: nodeRequestType is create, but spec.serverSpec is not set
+              rule: 'self.nodeRequestType == ''create'' ? has(self.serverSpec) : true'
+            - message: nodeRequestType is delete, but spec.node is not set
+              rule: 'self.nodeRequestType == ''delete'' ? has(self.node) : true'
+            - message: nodeRequestType is delete, but spec.serverSpec is set
+              rule: 'self.nodeRequestType == ''delete'' ? !has(self.serverSpec) :
+                true'
+            - message: nodeRequestType is delete, but spec.location is set
+              rule: 'self.nodeRequestType == ''delete'' ? !has(self.location) : true'
+            - message: '`spec` may not be modified after creation.'
+              rule: self == oldSelf
+          status:
+            description: NodeScalingRequestStatus defines the observed state of NodeScalingRequest.
+            properties:
+              clusterName:
+                description: ClusterName is the name of the Cluster resource.
+                type: string
+              clusterNamespace:
+                description: ClusterNamespace is the namespace where the Cluster resource
+                  is located.
+                type: string
+              conditions:
+                description: Conditions represent the state of the NodeScalingRequest.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              desiredReplicas:
+                description: DesiredReplicas is the desired number of replicas after
+                  scaling.
+                format: int32
+                type: integer
+              machineDeploymentName:
+                description: MachineDeploymentName is the name of the MachineDeployment
+                  being scaled.
+                type: string
+              machineDeploymentUID:
+                description: MachineDeploymentUID is the uid of the MachineDeployment
+                  being scaled.
+                type: string
+              phase:
+                default: ""
+                description: Phase is the current phase of the scaling request
+                enum:
+                - ""
+                - Creating
+                - Created
+                - CreateFailed
+                - Deleting
+                - Deleted
+                - DeleteFailed
+                - Pending
+                type: string
+            required:
+            - phase
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: alert-receiver
+  name: scale-controller-alert-receiver-sa
+  namespace: scale-controller-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-controller-manager
+  namespace: scale-controller-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-leader-election-role
+  namespace: scale-controller-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: alert-receiver
+  name: scale-controller-alert-receiver-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: nsr
+  name: scale-controller-cardalert-admin-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts
+  verbs:
+  - '*'
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: nsr
+  name: scale-controller-cardalert-editor-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: nsr
+  name: scale-controller-cardalert-viewer-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-cardscalingrequest-admin-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardscalingrequests
+  verbs:
+  - '*'
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardscalingrequests/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-cardscalingrequest-editor-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardscalingrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardscalingrequests/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-cardscalingrequest-viewer-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardscalingrequests
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardscalingrequests/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scale-controller-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts
+  - cardscalingrequests
+  - nodescalingrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts/finalizers
+  - cardscalingrequests/finalizers
+  - nodescalingrequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - cardalerts/status
+  - cardscalingrequests/status
+  - nodescalingrequests/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - resource.k8s.io
+  resources:
+  - devicetaintrules
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scale-controller-metrics-auth-role
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scale-controller-metrics-reader
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-nodescalingrequest-admin-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - nodescalingrequests
+  verbs:
+  - '*'
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - nodescalingrequests/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-nodescalingrequest-editor-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - nodescalingrequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - nodescalingrequests/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-nodescalingrequest-viewer-role
+rules:
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - nodescalingrequests
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.my.domain
+  resources:
+  - nodescalingrequests/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-leader-election-rolebinding
+  namespace: scale-controller-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: scale-controller-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: scale-controller-controller-manager
+  namespace: scale-controller-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: alert-receiver
+  name: scale-controller-alert-receiver-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: scale-controller-alert-receiver-role
+subjects:
+- kind: ServiceAccount
+  name: scale-controller-alert-receiver-sa
+  namespace: scale-controller-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: scale-controller-manager-role
+subjects:
+- kind: ServiceAccount
+  name: scale-controller-controller-manager
+  namespace: scale-controller-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: scale-controller-metrics-auth-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: scale-controller-metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: scale-controller-controller-manager
+  namespace: scale-controller-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: alert-receiver
+  name: scale-controller-alert-receiver-service
+  namespace: scale-controller-system
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    control-plane: alert-receiver
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+    control-plane: controller-manager
+  name: scale-controller-controller-manager-metrics-service
+  namespace: scale-controller-system
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    app.kubernetes.io/name: scale-controller
+    control-plane: controller-manager
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-webhook-service
+  namespace: scale-controller-system
+spec:
+  ports:
+  - port: 443
+    protocol: TCP
+    targetPort: 9443
+  selector:
+    app.kubernetes.io/name: scale-controller
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: alert-receiver
+    control-plane: alert-receiver
+  name: scale-controller-alert-receiver
+  namespace: scale-controller-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alert-receiver
+      control-plane: alert-receiver
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: alert-receiver
+      labels:
+        app.kubernetes.io/name: alert-receiver
+        control-plane: alert-receiver
+    spec:
+      containers:
+      - args: []
+        command:
+        - /alert-receiver
+        env:
+        - name: CARD_ALERT_NAMESPACE
+          value: default
+        image: card-alert-receiver:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: alert-receiver
+        ports: []
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts: []
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: scale-controller-alert-receiver-sa
+      terminationGracePeriodSeconds: 10
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      volumes: []
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+    control-plane: controller-manager
+  name: scale-controller-controller-manager
+  namespace: scale-controller-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: scale-controller
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: scale-controller
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --metrics-bind-address=:8443
+        - --leader-elect
+        - --health-probe-bind-address=:8081
+        - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+        command:
+        - /manager
+        env:
+        - name: MANAGEMENT_KUBECONFIG
+          value: /etc/management-kubeconfig/kubeconfig
+        - name: NSR_TTL_SECONDS_AFTER_FINISHED
+          value: "3600"
+        - name: CSR_TTL_SECONDS_AFTER_FINISHED
+          value: "3600"
+        - name: CARD_ALERT_TTL_SECONDS_AFTER_FINISHED
+          value: "3600"
+        - name: MACHINE_ALERT_NAMESPACE
+          value: dcirpm
+        - name: PROVIDER_NAME
+          value: DCI
+        image: controller:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /etc/management-kubeconfig
+          name: management-kubeconfig
+          readOnly: true
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: webhook-certs
+          readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: scale-controller-controller-manager
+      terminationGracePeriodSeconds: 10
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      volumes:
+      - name: management-kubeconfig
+        secret:
+          secretName: management-kubeconfig
+      - name: webhook-certs
+        secret:
+          secretName: webhook-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-metrics-certs
+  namespace: scale-controller-system
+spec:
+  dnsNames:
+  - scale-controller-controller-manager-metrics-service.scale-controller-system.svc
+  - scale-controller-controller-manager-metrics-service.scale-controller-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: scale-controller-selfsigned-issuer
+  secretName: metrics-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-serving-cert
+  namespace: scale-controller-system
+spec:
+  dnsNames:
+  - scale-controller-webhook-service.scale-controller-system.svc
+  - scale-controller-webhook-service.scale-controller-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: scale-controller-selfsigned-issuer
+  secretName: webhook-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: scale-controller
+  name: scale-controller-selfsigned-issuer
+  namespace: scale-controller-system
+spec:
+  selfSigned: {}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: scale-controller-system/scale-controller-serving-cert
+  name: scale-controller-validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: scale-controller-webhook-service
+      namespace: scale-controller-system
+      path: /validate-cluster-my-domain-v1alpha1-cardscalingrequest
+  failurePolicy: Fail
+  name: vcardscalingrequest-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - cluster.my.domain
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - cardscalingrequests
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: scale-controller-webhook-service
+      namespace: scale-controller-system
+      path: /validate-cluster-my-domain-v1alpha1-nodescalingrequest
+  failurePolicy: Fail
+  name: vnodescalingrequest-v1alpha1.kb.io
+  rules:
+  - apiGroups:
+    - cluster.my.domain
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - nodescalingrequests
+  sideEffects: None

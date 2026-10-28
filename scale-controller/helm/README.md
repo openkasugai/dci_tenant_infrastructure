@@ -5,7 +5,7 @@ Helm chart for the Scale Controller
 This document describes how to create, install and uninstall a helm chart for the Scale Controller.
 
 ## Prerequisites
-- kubebuilder v4.4.0+
+- kubebuilder v4.10.0+ (recommended: v4.10.1+)
 - helm v3.17.0+
 
 ## Create a helm chart
@@ -16,6 +16,13 @@ make helmchart
 ```
 under the directory containing the `Makefile`.
 The helm chart will be created under the `dist` directory with the name `scale-controller-<version>.tgz`.
+
+Generation flow (helm/v2-alpha):
+- Input: `config` (kustomize)
+- Step 1: generate `dist/install.yaml`
+- Step 2: generate `dist/chart` from `dist/install-scale-controller.yaml`
+- Step 3: complement uncovered parts with `helm/patches/chart`
+- Values policy: keep `helm/patches/chart/values.yaml` as user-editable source and sync it into `dist/chart/values.yaml`
 
 ## Install
 
@@ -30,13 +37,17 @@ receiver_image_tag=0.3.0
 path_to_management_kubeconfig=/path/to/management.kubeconfig
 ```
 
+Note:
+- `managementKubeconfig` default value in `values.yaml` is `dummy-kubeconfig` for local rendering/tests.
+- For production operation, always provide a real kubeconfig via `--set-file managementKubeconfig=...`.
+
 ### Install with Alert Receiver
 ```sh
 helm install scale-controller ${path_to_helm_chart} \
     --create-namespace \
     --namespace scale-controller-system \
-    --set controllerManager.container.image.repository=scale-controller \
-    --set controllerManager.container.image.tag=${controller_image_tag} \
+    --set manager.image.repository=scale-controller \
+    --set manager.image.tag=${controller_image_tag} \
     --set alertReceiver.container.image.repository=card-alert-receiver \
     --set alertReceiver.container.image.tag=${receiver_image_tag} \
     --set-file managementKubeconfig=${path_to_management_kubeconfig}
@@ -59,8 +70,8 @@ If you see the following message, the operation was successful.
 helm install scale-controller ${path_to_helm_chart} \
     --create-namespace \
     --namespace scale-controller-system \
-    --set controllerManager.container.image.repository=scale-controller \
-    --set controllerManager.container.image.tag=${controller_image_tag} \
+    --set manager.image.repository=scale-controller \
+    --set manager.image.tag=${controller_image_tag} \
     --set alertReceiver.enable=false \
     --set-file managementKubeconfig=${path_to_management_kubeconfig}
 ```

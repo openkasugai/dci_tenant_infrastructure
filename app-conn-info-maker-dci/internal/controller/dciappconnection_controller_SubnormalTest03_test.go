@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -162,7 +148,7 @@ func dciappconnection_controller_SubnormalTest03_1(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR FromX1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR FromX1.")
@@ -191,7 +177,7 @@ func dciappconnection_controller_SubnormalTest03_1(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR ToA1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR ToA1.")
@@ -220,7 +206,7 @@ func dciappconnection_controller_SubnormalTest03_1(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR ToA2.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR ToA2.")
@@ -249,7 +235,7 @@ func dciappconnection_controller_SubnormalTest03_1(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR ToC1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR ToC1.")
@@ -278,7 +264,7 @@ func dciappconnection_controller_SubnormalTest03_1(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR ToY1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR ToY1.")
@@ -288,7 +274,7 @@ func dciappconnection_controller_SubnormalTest03_1(writer bytes.Buffer, reconcil
 
 	// Create DCIAppConnectionCR
 	pstDCIAppConnectionCR := DCIAppConnection01.DeepCopy()
-	pstDCIAppConnectionCR.Spec.OutputEndpoint.Internal.DeploymentRef.Name = cDeployment01NameFromZ
+	pstDCIAppConnectionCR.Spec.OutputEndpoints[0].Internal.DeploymentRef.Name = cDeployment01NameFromZ
 	err = k8sClient.Create(ctx, pstDCIAppConnectionCR)
 	if err != nil {
 		fmt.Println("There is a problem in createing DCIAppConnection01")
@@ -938,7 +924,7 @@ func dciappconnection_controller_SubnormalTest03_2(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR FromX1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR FromX1.")
@@ -969,7 +955,7 @@ func dciappconnection_controller_SubnormalTest03_2(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR ToA1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR ToA1.")
@@ -1000,7 +986,7 @@ func dciappconnection_controller_SubnormalTest03_2(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR ToA2.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR ToA2.")
@@ -1031,7 +1017,7 @@ func dciappconnection_controller_SubnormalTest03_2(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR ToC1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR ToC1.")
@@ -1062,7 +1048,7 @@ func dciappconnection_controller_SubnormalTest03_2(writer bytes.Buffer, reconcil
 	} else {
 		fmt.Println("Success to get PodCR ToY1.")
 	}
-	stPodCR.Status.Phase = PodStatusRunning.Phase
+	stPodCR.Status.Conditions = PodStatusReady
 	err = k8sClient.Status().Update(ctx, &stPodCR)
 	if err != nil {
 		fmt.Println("Failed to update PodCR ToY1.")
@@ -1072,9 +1058,9 @@ func dciappconnection_controller_SubnormalTest03_2(writer bytes.Buffer, reconcil
 
 	// Create DCIAppConnectionCR
 	pstDCIAppConnectionCR := DCIAppConnection01.DeepCopy()
-	pstDCIAppConnectionCR.Status.Phase = DCIAppConnection01Status.Phase
+	pstDCIAppConnectionCR.Status = DCIAppConnection01Status
 	controllerutil.AddFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
-	pstDCIAppConnectionCR.Spec.OutputEndpoint.Internal.DeploymentRef.Name = cDeployment01NameFromZ
+	pstDCIAppConnectionCR.Spec.OutputEndpoints[0].Internal.DeploymentRef.Name = cDeployment01NameFromZ
 	err = k8sClient.Create(ctx, pstDCIAppConnectionCR)
 	if err != nil {
 		fmt.Println("There is a problem in createing DCIAppConnection01")

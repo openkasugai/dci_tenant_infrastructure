@@ -14,7 +14,7 @@ spec:
       labels:
         cluster.x-k8s.io/cluster-name: ${CLUSTER_NAME}
     spec:
-      version: v1.34.2
+      version: v1.36.1
       clusterName: ${CLUSTER_NAME}
       bootstrap:
         configRef:

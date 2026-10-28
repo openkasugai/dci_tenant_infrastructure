@@ -1,33 +1,18 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"bytes"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"strconv"
-	"time"
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -65,7 +50,7 @@ var GetDCIAppStateEventKind = getDCIAppStateEventKind
 // the user.
 //
 // For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.24.1/pkg/reconcile
 func (r *DCIAppStateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	stCtrlResult := ctrl.Result{}
 	var resultErr error
@@ -131,16 +116,20 @@ func (r *DCIAppStateReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if err != nil {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = false
 		resultErr = err
 	} else if bExclusiveFlag {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = true
 		stCtrlResult.RequeueAfter =
 			time.Millisecond * examplecomv1.ExclusiveInterval
 	} else {
+		//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 		stCtrlResult.Requeue = false
 	}
 
+	//nolint:staticcheck // Intentionally kept to preserve existing requeue behavior and compatibility with current tests.
 	log.Info(cMyFuncName + " return." +
 		" stCtrlResult.Requeue: " + strconv.FormatBool(stCtrlResult.Requeue) +
 		", stCtrlResult.RequeueAfter: " + stCtrlResult.RequeueAfter.String() +

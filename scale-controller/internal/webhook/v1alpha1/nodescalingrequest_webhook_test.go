@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package v1alpha1
 
 import (
@@ -93,17 +79,6 @@ var _ = Describe("NodeScalingRequest Webhook Methods directly calling", Label("n
 			})
 		})
 
-		It("Should admit deletion", func() {
-			var validator *NodeScalingRequestCustomValidator
-			By("setting up validator", func() {
-				validator = &NodeScalingRequestCustomValidator{}
-			})
-			By("executing ValidateDelete", func() {
-				_, err := validator.ValidateDelete(ctx, (*scalev1.NodeScalingRequest)(nil))
-				Expect(err).NotTo(HaveOccurred())
-			})
-		})
-
 		It("Should deny deletion if object is not NodeScalingRequest", func() {
 			var validator *NodeScalingRequestCustomValidator
 			By("setting up validator", func() {
@@ -112,6 +87,17 @@ var _ = Describe("NodeScalingRequest Webhook Methods directly calling", Label("n
 			By("executing ValidateDelete", func() {
 				_, err := validator.ValidateDelete(ctx, nil)
 				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		It("Should admit deletion if object is NodeScalingRequest", func() {
+			var validator *NodeScalingRequestCustomValidator
+			By("setting up validator", func() {
+				validator = &NodeScalingRequestCustomValidator{}
+			})
+			By("executing ValidateDelete", func() {
+				_, err := validator.ValidateDelete(ctx, &scalev1.NodeScalingRequest{})
+				Expect(err).NotTo(HaveOccurred())
 			})
 		})
 	})

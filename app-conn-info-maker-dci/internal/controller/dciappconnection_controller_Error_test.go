@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -424,6 +410,156 @@ var _ = Describe("DCIAppConnection Controller", func() {
 			//  In-X,Out-Y
 			// ------------------------------
 			dciappconnection_controller_ErrorTest16_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update Rollback Status Change Patch Error", func() {
+			By("ErrorTest17_1: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest17_1 Update Rollback Status Change Patch Error
+			//  X-A,X-C X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest17_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Create Deployment Y Get Error", func() {
+			By("ErrorTest18_1: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest18_1 Update Deployment Y Get Error
+			//  X-A,Y-C X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest18_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update DCIAppConnection Patch Error", func() {
+			By("ErrorTest19_1: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest19_1 Update DCIAppConnection Patch Error
+			//  X-A,Y-C X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest19_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update DCIAppConnection Patch Error & Update Roll Back Get ToY1 Error", func() {
+			By("ErrorTest19_2: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest19_2 Update DCIAppConnection Patch Error & Update Roll Back ToY1 Get Error
+			//  X-A,Y-C X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest19_2(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update DCIAppConnection Patch Error & Update Roll Back ToY1 Patch Error", func() {
+			By("ErrorTest19_3: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest19_3 Update DCIAppConnection Patch Error & Update Roll Back ToY1 Patch Error
+			//  X-A,Y-C X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest19_3(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update DCIAppConnection Patch Error & Update Roll Back FromX1 Get Error", func() {
+			By("ErrorTest19_4: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest19_4 Update DCIAppConnection Patch Error & Update Roll Back FromX1 Get Error
+			//  X-A,Y-C X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest19_4(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update DCIAppConnection Patch Error & Update Roll Back FromX1 Patch Error", func() {
+			By("ErrorTest19_5: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest19_5 Update DCIAppConnection Patch Error & Update Roll Back FromX1 Patch Error
+			//  X-A,Y-C X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest19_5(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update From Y-C Del Service Get Error", func() {
+			By("ErrorTest20_1: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest20_1 Update From Y-C Del Service Get Error
+			//  X-A, X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest20_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update From Y-C Del Service Delete Error", func() {
+			By("ErrorTest20_2: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest20_2 Update From Y-C Del Service Delete Error
+			//  X-A, X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest20_2(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update In-Y Chg FromX1 Del ConnectEndpoint Get Error", func() {
+			By("ErrorTest21_1: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest21_1 Update In-Y Chg FromX1 Del ConnectEndpoint Get Error
+			//  X-None
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest21_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update From X-A->Y-A Chg ConnectEndpoint Patch Error", func() {
+			By("ErrorTest22_1: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest22_1 Update From X-A->Y-A Chg ConnectEndpoint Patch Error
+			//  X-A, X-Y
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest22_1(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update From X-A->Y-A Chg ConnectEndpoint ToY1 Patch Error", func() {
+			By("ErrorTest22_2: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest22_2 Update From X-A->Y-A Chg ConnectEndpoint ToY1 Patch Error
+			//  X-A, X-Y FromX1 ConnectEndpoint None
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest22_2(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update To X-Y Add EndpointSlice Create Error", func() {
+			By("ErrorTest22_3: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest22_3 Update To X-Y Add EndpointSlice Create Error
+			//  X-None
+			//  Y-C
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest22_3(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update From X-Y Add ConnectEndpoint Create Error", func() {
+			By("ErrorTest22_4: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest22_4 Update From X->Y Add ConnectEndpoint Create Error
+			//  X-None
+			//  Y-C
+			//  In-Y,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest22_4(writer, reconciler, mockClient)
+		})
+		It("DCIAppConnection Update Y-C Add Unmatch Error Pending Patch Error", func() {
+			By("ErrorTest23_1: Reconciling the updated resource")
+			// ------------------------------
+			//  ErrorTest23_1 Update Y-C Add Unmatch Error Pending Patch Error
+			//  X-A, X-Y
+			//  Y-None
+			//  In-X,Out-Y
+			// ------------------------------
+			dciappconnection_controller_ErrorTest23_1(writer, reconciler, mockClient)
 		})
 	})
 })

@@ -1,24 +1,16 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package client
 
 import (
 	"context"
 
+	// TODO: Switch to "k8s.io/api/resource/v1" once DeviceTaintRule is supported in v1.
+	// DeviceTaintRule is currently available only in v1beta2, so we use v1beta2 for now.
+	// However, ResourceSlice in v1beta2 is deprecated in v1.36+ and will be removed in v1.39+,
+	// so we should migrate to v1 as soon as DeviceTaintRule is available there.
+	resourcev1beta "k8s.io/api/resource/v1beta2"
+
 	corev1 "k8s.io/api/core/v1"
-	resourcev1 "k8s.io/api/resource/v1alpha3"
+	resourcev1 "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	capiv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -35,6 +27,7 @@ import (
 type ClientHelper interface {
 	ClientNodeHelper
 	ClientDeviceTaintRuleHelper
+	ClientResourceSliceHelper
 	ClientMachineHelper
 	ClientMachineSetHelper
 	ClientDCIMachineHelper
@@ -183,6 +176,8 @@ type ClientDCIMachineTemplateHelper interface {
 }
 
 // ClientDockerMachineTemplateHelper defines helper functions that use clients.
+//
+//nolint:staticcheck // capdockerv1.DockerMachineTemplate is deprecated but still used because this is only for test purpose
 type ClientDockerMachineTemplateHelper interface {
 	// GetDockerMachineTemplate gets DockerMachineTemplate resource from management cluster.
 	// Parameters:
@@ -468,12 +463,11 @@ type ClientDeviceTaintRuleHelper interface {
 	// ListDeviceTaintRule lists DeviceTaintRule resources from workload cluster.
 	// Parameters:
 	//   - ctx: Context for the request
-	//   - namespace: Namespace of the DeviceTaintRule resources
 	// Returns:
 	//   - deviceTaintRuleList: List of DeviceTaintRule resources
 	//   - err: Error object if an error occurred, otherwise nil
-	ListDeviceTaintRule(ctx context.Context, namespace string,
-	) (deviceTaintRuleList *resourcev1.DeviceTaintRuleList, err error)
+	ListDeviceTaintRule(ctx context.Context,
+	) (deviceTaintRuleList *resourcev1beta.DeviceTaintRuleList, err error)
 
 	// CreateDeviceTaintRule creates a DeviceTaintRule resource in the workload cluster.
 	// Parameters:
@@ -481,8 +475,20 @@ type ClientDeviceTaintRuleHelper interface {
 	//   - deviceTaintRule: DeviceTaintRule resource to be created
 	// Returns:
 	//   - err: Error object if an error occurred, otherwise nil
-	CreateDeviceTaintRule(ctx context.Context, deviceTaintRule *resourcev1.DeviceTaintRule,
+	CreateDeviceTaintRule(ctx context.Context, deviceTaintRule *resourcev1beta.DeviceTaintRule,
 	) (err error)
+}
+
+// ClientDeviceTaintRuleHelper defines helper functions that use clients.
+type ClientResourceSliceHelper interface {
+	// ListResourceSlice lists ResourceSlice resources from workload cluster.
+	// Parameters:
+	//   - ctx: Context for the request
+	// Returns:
+	//   - resourceSliceList: List of ResourceSlice resources
+	//   - err: Error object if an error occurred, otherwise nil
+	ListResourceSlice(ctx context.Context,
+	) (resourceSliceList *resourcev1.ResourceSliceList, err error)
 }
 
 // ClientLogicalServerHelper defines helper functions that use clients.

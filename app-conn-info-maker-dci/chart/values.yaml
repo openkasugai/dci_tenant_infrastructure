@@ -9,9 +9,10 @@ controllerManager:
       capabilities:
         drop:
         - ALL
+      readOnlyRootFilesystem: true
     image:
       repository: localhost/app-conn-info-maker-dci
-      tag: 0.3.4
+      tag: 1.0.0
     resources:
       limits:
         cpu: 500m
@@ -19,29 +20,28 @@ controllerManager:
       requests:
         cpu: 10m
         memory: 64Mi
-    nodeSelector: {}
-    tolerations:
-    - key: "node-role.kubernetes.io/control-plane"
-      effect: "NoSchedule"
-    affinity:
-      podAntiAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-        - labelSelector:
-            matchLabels:
-              app.kubernetes.io/instance: app-conn-info-maker-dci
-          topologyKey: kubernetes.io/hostname
-    strategy:
-      rollingUpdate:
-        maxSurge: 0
-        maxUnavailable: 1
-      type: RollingUpdate
+  nodeSelector: {}
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
       type: RuntimeDefault
   replicas: 1
-  serviceAccount:
-    annotations: {}
+  tolerations:
+  - key: "node-role.kubernetes.io/control-plane"
+    effect: "NoSchedule"
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: app-conn-info-maker-dci
+        topologyKey: kubernetes.io/hostname
+  topologySpreadConstraints: []
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
 kubernetesClusterDomain: cluster.local
 metricsService:
   ports:
@@ -50,3 +50,8 @@ metricsService:
     protocol: TCP
     targetPort: 8443
   type: ClusterIP
+serviceAccount:
+  annotations: {}
+  automount: true
+  create: true
+  name: ""

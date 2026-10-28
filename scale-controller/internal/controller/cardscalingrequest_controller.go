@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -24,7 +10,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,7 +32,7 @@ type CardScalingRequestReconciler struct {
 	Scheme *runtime.Scheme
 
 	// interface for event recorder
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 
 	// client for management cluster
 	ClientHelper helperclient.ClientHelper
@@ -65,7 +51,7 @@ type CardScalingRequestReconciler struct {
 // Additional rbac
 // +kubebuilder:rbac:groups=cluster.my.domain,resources=nodescalingrequests,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -219,7 +205,7 @@ func (r *CardScalingRequestReconciler) doReconcile(
 
 	if err != nil {
 		err = fmt.Errorf("failed to execute Reconcile process for state '%s': %w", lastCSR.Status.Phase, err)
-		r.Recorder.Event(csr, corev1.EventTypeWarning, eventReason, err.Error())
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeWarning, eventReason, eventActionReconciling, err.Error())
 	}
 
 	return rslt, err
@@ -303,7 +289,7 @@ func (r *CardScalingRequestReconciler) reconcileCardScaleInitial(
 	}
 	if len(processingCSRs) > 0 {
 		// Other processing CardScalingRequests exist, update Phase to PhaseCardScalePending
-		r.Recorder.Event(csr, corev1.EventTypeNormal, eventReasonPending,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonPending, eventActionReconciling,
 			"Pending this CardScalingRequest until another one is completed")
 		csr.Status.Phase = scalev1.PhaseCardScalePending
 		return ctrl.Result{RequeueAfter: requeueIntervalCardScalingRequestPending}, nil
@@ -369,7 +355,7 @@ func (r *CardScalingRequestReconciler) reconcileCardScaleInitializing(
 			logger := log.FromContext(ctx)
 			logger.Info("Target GPU is already removed from LogicalServer, so skip scaling process and complete CardScalingRequest",
 				"GPUSpec", ls.Spec.ServerSpec.GPU)
-			r.Recorder.Event(csr, corev1.EventTypeNormal, eventReasonCompleted,
+			r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonCompleted, eventActionReconciling,
 				"CardScalingRequest is completed because target GPU is already removed from LogicalServer")
 			return ctrl.Result{}, nil
 		}
@@ -724,7 +710,7 @@ func (r *CardScalingRequestReconciler) reconcileCardScaleInitialized(
 	if err := r.Create(ctx, nsr); err == nil {
 		// Update Phase to PhaseNodeScalingDown
 		csr.Status.Phase = scalev1.PhaseNodeScalingDown
-		r.Recorder.Eventf(csr, corev1.EventTypeNormal, eventReasonScalingDownStarted,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonScalingDownStarted, eventActionReconciling,
 			"NodeScalingRequest %s/%s is created for scaling down", nsr.Namespace, nsr.Name)
 		return ctrl.Result{}, nil
 	} else if !apierrors.IsAlreadyExists(err) {
@@ -774,7 +760,7 @@ func (r *CardScalingRequestReconciler) reconcileNodeScalingDown(
 	switch nsr.Status.Phase {
 	case scalev1.PhaseNodeDeleted:
 		logger.Info("NodeScalingRequest for scaling down is completed successfully")
-		r.Recorder.Eventf(csr, corev1.EventTypeNormal, eventReasonScalingDownCompleted,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonScalingDownCompleted, eventActionReconciling,
 			"NodeScalingRequest %s/%s is completed for scaling down", nsr.Namespace, nsr.Name)
 		// Update Phase to PhaseNodeScaleDownDeleting
 		csr.Status.Phase = scalev1.PhaseNodeScaleDownDeleting
@@ -870,7 +856,7 @@ func (r *CardScalingRequestReconciler) reconcileNodeScaleDownCompleted(
 
 	// Create NodeScalingRequest resource in workload cluster
 	if err := r.Create(ctx, nsr); err == nil {
-		r.Recorder.Eventf(csr, corev1.EventTypeNormal, eventReasonScalingUpStarted,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonScalingUpStarted, eventActionReconciling,
 			"NodeScalingRequest %s/%s is created for scaling up", nsr.Namespace, nsr.Name)
 		// Update Phase to PhaseNodeScalingUp
 		csr.Status.Phase = scalev1.PhaseNodeScalingUp
@@ -931,7 +917,7 @@ func (r *CardScalingRequestReconciler) reconcileNodeScalingUp(
 	switch nsr.Status.Phase {
 	case scalev1.PhaseNodeCreated:
 		logger.Info("NodeScalingRequest for scaling up is completed successfully")
-		r.Recorder.Eventf(csr, corev1.EventTypeNormal, eventReasonScalingUpCompleted,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonScalingUpCompleted, eventActionReconciling,
 			"NodeScalingRequest %s/%s is completed for scaling up", nsr.Namespace, nsr.Name)
 		// Cleanup MachineDeployment annotation for card scaling
 		newMDName := csr.Status.NewDCIMachineInfo.MachineDeploymentName
@@ -1028,7 +1014,7 @@ func (r *CardScalingRequestReconciler) reconcileTerminalPhase(
 	}
 
 	logger.Info("Expired CardScalingRequest is deleted successfully")
-	r.Recorder.Event(csr, corev1.EventTypeNormal, eventReasonExpired,
+	r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonExpired, eventActionReconciling,
 		"CardScalingRequest is terminated and deleted after TTL expiration")
 	return ctrl.Result{}, nil
 }
@@ -1098,7 +1084,7 @@ func (r *CardScalingRequestReconciler) doFinalize(
 
 	if err != nil {
 		err = fmt.Errorf("failed to execute Finalizer process for state '%s': %w", lastCSR.Status.Phase, err)
-		r.Recorder.Event(csr, corev1.EventTypeWarning, eventReason, err.Error())
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeWarning, eventReason, eventActionReconciling, err.Error())
 	}
 
 	return rslt, err
@@ -1136,7 +1122,7 @@ func (r *CardScalingRequestReconciler) reconcileWaitingForScaleUp(
 	switch nsr.Status.Phase {
 	case scalev1.PhaseNodeCreated:
 		logger.Info("NodeScalingRequest for scaling up is completed successfully")
-		r.Recorder.Eventf(csr, corev1.EventTypeNormal, eventReasonFinalizerScalingUpCompleted,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonFinalizerScalingUpCompleted, eventActionReconciling,
 			"NodeScalingRequest %s/%s is completed for scaling up in Finalizer", nsr.Namespace, nsr.Name)
 		// Scaling up is completed successfully,
 		// so we need not to cleanup created resources.
@@ -1146,7 +1132,7 @@ func (r *CardScalingRequestReconciler) reconcileWaitingForScaleUp(
 
 	case scalev1.PhaseNodeCreateFailed:
 		logger.Info("NodeScalingRequest for scaling up is completed with failure")
-		r.Recorder.Eventf(csr, corev1.EventTypeWarning, eventReasonFinalizerScalingUpFailed,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeWarning, eventReasonFinalizerScalingUpFailed, eventActionReconciling,
 			"NodeScalingRequest %s/%s is failed for scaling up in Finalizer", nsr.Namespace, nsr.Name)
 		// Scaling up is completed unsuccessfully,
 		// so we proceed to clean up created resources.
@@ -1196,7 +1182,7 @@ func (r *CardScalingRequestReconciler) reconcileWaitingForScaleDown(
 	switch nsr.Status.Phase {
 	case scalev1.PhaseNodeDeleted:
 		logger.Info("NodeScalingRequest for scaling down is completed successfully")
-		r.Recorder.Eventf(csr, corev1.EventTypeNormal, eventReasonFinalizerScalingDownCompleted,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeNormal, eventReasonFinalizerScalingDownCompleted, eventActionReconciling,
 			"NodeScalingRequest %s/%s is completed for scaling down in Finalizer", nsr.Namespace, nsr.Name)
 		// Scaling down is completed successfully,
 		// so we skip to cleanup DCIMachine annotation, and proceed to cleanup MachineDeployment.
@@ -1206,7 +1192,7 @@ func (r *CardScalingRequestReconciler) reconcileWaitingForScaleDown(
 
 	case scalev1.PhaseNodeDeleteFailed:
 		logger.Info("NodeScalingRequest for scaling down is completed with failure")
-		r.Recorder.Eventf(csr, corev1.EventTypeWarning, eventReasonFinalizerScalingDownFailed,
+		r.Recorder.Eventf(csr, nil, corev1.EventTypeWarning, eventReasonFinalizerScalingDownFailed, eventActionReconciling,
 			"NodeScalingRequest %s/%s is failed for scaling down in Finalizer", nsr.Namespace, nsr.Name)
 		// Scaling down is completed unsuccessfully,
 		// so we proceed to clean up created resources.

@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 // Package controller provides functions to handle NodeScalingRequest.
 package controller
 
@@ -27,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 
 	capiv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -84,7 +70,7 @@ type NodeScalingRequestReconciler struct {
 	Scheme *runtime.Scheme
 
 	// interface for event recorder
-	Recorder record.EventRecorder
+	Recorder events.EventRecorder
 
 	// helper client for management cluster
 	ClientHelper helperclient.ClientHelper
@@ -105,7 +91,7 @@ type NodeScalingRequestReconciler struct {
 
 // Additional rbac
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
-// +kubebuilder:rbac:groups=core,resources=events,verbs=create;update;patch
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;update;patch
 
 // Reconcile is a function to move the current state of the cluster closer to the desired state,
 // as part of the main kubernetes reconciliation loop.
@@ -151,7 +137,7 @@ func (r *NodeScalingRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// Check if the NodeScalingRequest is being deleted then finalize it.
 	if finalized, err := r.doFinalize(ctx, nsr, lastNSR); err != nil {
-		r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonFinalizerFailed, err.Error())
+		r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonFinalizerFailed, eventActionReconciling, err.Error())
 		return ctrl.Result{}, fmt.Errorf("failed to finalize NodeScalingRequest: %w", err)
 	} else if finalized {
 		// If NodeScalingRequest is being deleted, we should not proceed with reconciliation.
@@ -168,10 +154,10 @@ func (r *NodeScalingRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		// initialize Reconcile
 		if rslt, err = r.initializeReconcile(ctx, nsr, lastNSR); err != nil {
 			err = fmt.Errorf("failed to initialize reconcile: %w", err)
-			r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonInitializingFailed, err.Error())
+			r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonInitializingFailed, eventActionReconciling, err.Error())
 			break
 		} else if !rslt.IsZero() {
-			r.Recorder.Event(nsr, corev1.EventTypeNormal, eventReasonPending,
+			r.Recorder.Eventf(nsr, nil, corev1.EventTypeNormal, eventReasonPending, eventActionReconciling,
 				"Pending this NodeScalingRequest until another one is completed")
 			break
 		}
@@ -182,21 +168,21 @@ func (r *NodeScalingRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 			rslt, err = r.startScaleUp(ctx, nsr, lastNSR)
 			if err != nil {
 				err = fmt.Errorf("failed to scale up node: %w", err)
-				r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonScalingUpFailed, err.Error())
+				r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonScalingUpFailed, eventActionReconciling, err.Error())
 			}
 
 		case scalev1.TypeDelete:
 			rslt, err = r.startScaleDown(ctx, nsr, lastNSR)
 			if err != nil {
 				err = fmt.Errorf("failed to scale down node: %s: %w", *nsr.Spec.Node, err)
-				r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonScalingDownFailed, err.Error())
+				r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonScalingDownFailed, eventActionReconciling, err.Error())
 			}
 
 		default:
 			// This case is only for failsafe, but should not happen because crd validation is checked.
 			nsr.Status.Phase = scalev1.PhaseNodeCreateFailed
 			err = fmt.Errorf("nodeRequestType is invalid: NodeRequestType is %s", nsr.Spec.NodeRequestType)
-			r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonInvalidType, err.Error())
+			r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonInvalidType, eventActionReconciling, err.Error())
 			updateStatusConditions(conditions, Completed, metav1.ConditionFalse, "InvalidRequestType", err.Error())
 		}
 
@@ -204,28 +190,28 @@ func (r *NodeScalingRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 		rslt, err = r.proceedScaleUp(ctx, nsr)
 		if err != nil {
 			err = fmt.Errorf("failed to proceed scale up node: %w", err)
-			r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonScalingUpFailed, err.Error())
+			r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonScalingUpFailed, eventActionReconciling, err.Error())
 		}
 
 	case scalev1.PhaseNodeDeleting:
 		rslt, err = r.proceedScaleDown(ctx, nsr)
 		if err != nil {
 			err = fmt.Errorf("failed to proceed scale down node: %s: %w", *nsr.Spec.Node, err)
-			r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonScalingDownFailed, err.Error())
+			r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonScalingDownFailed, eventActionReconciling, err.Error())
 		}
 
 	case scalev1.PhaseNodeCreated, scalev1.PhaseNodeCreateFailed, scalev1.PhaseNodeDeleted, scalev1.PhaseNodeDeleteFailed:
 		rslt, err = r.cleanUpAfterFinished(ctx, nsr)
 		if err != nil {
 			err = fmt.Errorf("failed to delete expired NodeScalingRequest: %w", err)
-			r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonTerminationFailed, err.Error())
+			r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonTerminationFailed, eventActionReconciling, err.Error())
 		}
 		return rslt, err // should return without patching
 
 	default:
 		// This case is only for failsafe, but should not happen because crd validation is checked.
 		err = fmt.Errorf("phase is invalid: %s", nsr.Status.Phase)
-		r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonInvalidPhase, err.Error())
+		r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonInvalidPhase, eventActionReconciling, err.Error())
 		updateStatusConditions(conditions, Initialized, metav1.ConditionFalse, "InvalidPhase", err.Error())
 	}
 
@@ -238,7 +224,7 @@ func (r *NodeScalingRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 			err = fmt.Errorf("%w :%w", statusErr, err)
 		}
 		err = fmt.Errorf("failed to patch NodeScalingRequest status: %w", err)
-		r.Recorder.Event(nsr, corev1.EventTypeWarning, eventReasonUpdatingStatusFailed, err.Error())
+		r.Recorder.Eventf(nsr, nil, corev1.EventTypeWarning, eventReasonUpdatingStatusFailed, eventActionReconciling, err.Error())
 	}
 
 	return rslt, err
@@ -345,7 +331,7 @@ func (r *NodeScalingRequestReconciler) mapperNodeToNodeScalingRequest(ctx contex
 	// Write error to log if NodeScalingRequest cannot be listed
 	nodeScalingRequestList := &scalev1.NodeScalingRequestList{}
 	if err := r.List(ctx, nodeScalingRequestList); err != nil {
-		r.Recorder.Event(nodeScalingRequestList, corev1.EventTypeWarning, eventReasonFetchingFailed, err.Error())
+		r.Recorder.Eventf(nodeScalingRequestList, nil, corev1.EventTypeWarning, eventReasonFetchingFailed, eventActionReconciling, err.Error())
 		logger.Error(err, "failed to list NodeScalingRequests")
 		return nil
 	}
@@ -556,7 +542,7 @@ func (r *NodeScalingRequestReconciler) startScaleUp(
 	// succeed to request to management cluster, now update phase and conditions
 	updateStatusConditions(conditions, Requested, metav1.ConditionTrue, "ScalingRequestSucceeded", "")
 	nsr.Status.Phase = scalev1.PhaseNodeCreating
-	r.Recorder.Eventf(nsr, corev1.EventTypeNormal, eventReasonScalingUpStarted,
+	r.Recorder.Eventf(nsr, nil, corev1.EventTypeNormal, eventReasonScalingUpStarted, eventActionReconciling,
 		"MachineDeployment(%s) is requested to scale up to %d replicas", md.Name, *md.Spec.Replicas)
 	return ctrl.Result{}, nil // Success
 }
@@ -659,7 +645,7 @@ func (r *NodeScalingRequestReconciler) startScaleUpWithCreatingResource(
 	logger.Info("MachineDeployment is requested to scale up", "name", mdName, "desiredReplicas", 1)
 	updateStatusConditions(conditions, Requested, metav1.ConditionTrue, "CreatingResourceSucceeded", "")
 	nsr.Status.Phase = scalev1.PhaseNodeCreating
-	r.Recorder.Eventf(nsr, corev1.EventTypeNormal, eventReasonScalingUpStarted,
+	r.Recorder.Eventf(nsr, nil, corev1.EventTypeNormal, eventReasonScalingUpStarted, eventActionReconciling,
 		"MachineDeployment(%s) is requested to scale up to %d replicas", mdName, 1)
 	return ctrl.Result{}, nil
 }
@@ -727,7 +713,7 @@ func (r *NodeScalingRequestReconciler) startScaleDown(
 			nsr.Status.Phase = scalev1.PhaseNodeDeleting
 			nsr.Status.DesiredReplicas = ptr.To(int32(0))
 			nsr.Status.MachineDeploymentName = md.Name
-			r.Recorder.Eventf(nsr, corev1.EventTypeNormal, eventReasonScalingDownStarted,
+			r.Recorder.Eventf(nsr, nil, corev1.EventTypeNormal, eventReasonScalingDownStarted, eventActionReconciling,
 				"MachineDeployment(%s) is requested to be deleted", md.Name)
 			return ctrl.Result{}, nil // success
 		} // exist only 1 MachineDeployment
@@ -883,7 +869,7 @@ func (r *NodeScalingRequestReconciler) deleteMachine(
 	// succeed to request to management cluster, now update phase and conditions
 	updateStatusConditions(conditions, Requested, metav1.ConditionTrue, "ScalingRequestSucceeded", "")
 	nsr.Status.Phase = scalev1.PhaseNodeDeleting
-	r.Recorder.Eventf(nsr, corev1.EventTypeNormal, eventReasonScalingDownStarted,
+	r.Recorder.Eventf(nsr, nil, corev1.EventTypeNormal, eventReasonScalingDownStarted, eventActionReconciling,
 		"MachineDeployment(%s) is requested to scale down to %d replicas", md.Name, *md.Spec.Replicas)
 	return ctrl.Result{}, nil
 }
@@ -921,9 +907,9 @@ func (r *NodeScalingRequestReconciler) proceedScaleUp(
 
 	// check if ReadyReplicas of MD becomes desired value
 	if md.Status.ReadyReplicas == nil || *replicas > *md.Status.ReadyReplicas {
-		// requeue with exponential backoff when ReadyReplicas is not expected value yet
+		// requeue with const interval when ReadyReplicas is not expected value yet
 		updateStatusConditions(conditions, Completed, metav1.ConditionFalse, "Requeueing", "")
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: requeueIntervalNodeScalingRequestWaitingScaling}, nil
 	}
 
 	// remove in-progress labels from MachineDeployment
@@ -938,7 +924,7 @@ func (r *NodeScalingRequestReconciler) proceedScaleUp(
 	logger.Info("succeed to scale up", "machineDeploymentName", machineDeploymentName)
 	updateStatusConditions(conditions, Completed, metav1.ConditionTrue, "CompletionSucceeded", "")
 	nsr.Status.Phase = scalev1.PhaseNodeCreated
-	r.Recorder.Eventf(nsr, corev1.EventTypeNormal, eventReasonScalingUpCompleted,
+	r.Recorder.Eventf(nsr, nil, corev1.EventTypeNormal, eventReasonScalingUpCompleted, eventActionReconciling,
 		"MachineDeployment(%s) is scaled up to %d replicas", md.Name, *md.Spec.Replicas)
 	return ctrl.Result{RequeueAfter: (time.Duration(r.ttlSecondsAfterFinished)) * time.Second}, nil
 }
@@ -1033,9 +1019,9 @@ func (r *NodeScalingRequestReconciler) proceedScaleDown(
 
 	// check if ReadyReplicas of MD becomes desired value
 	if md != nil && replicas != nil && md.Status.ReadyReplicas != nil && *replicas < *md.Status.ReadyReplicas {
-		// requeue with exponential backoff
+		// requeue with const interval
 		updateStatusConditions(conditions, Completed, metav1.ConditionFalse, "Requeueing", "")
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: requeueIntervalNodeScalingRequestWaitingScaling}, nil
 	}
 
 	// remove in-progress labels from MachineDeployment
@@ -1053,7 +1039,8 @@ func (r *NodeScalingRequestReconciler) proceedScaleDown(
 	logger.Info("succeed to scale down the target node", "nodeName", *nodeName)
 	updateStatusConditions(conditions, Completed, metav1.ConditionTrue, "CompletionSucceeded", "")
 	nsr.Status.Phase = scalev1.PhaseNodeDeleted
-	r.Recorder.Eventf(nsr, corev1.EventTypeNormal, eventReasonScalingDownCompleted, "Node(%s) is deleted successfully", *nodeName)
+	r.Recorder.Eventf(nsr, nil, corev1.EventTypeNormal, eventReasonScalingDownCompleted, eventActionReconciling,
+		"Node(%s) is deleted successfully", *nodeName)
 	return ctrl.Result{RequeueAfter: (time.Duration(r.ttlSecondsAfterFinished)) * time.Second}, nil
 }
 

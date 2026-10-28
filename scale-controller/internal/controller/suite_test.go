@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package controller
 
 import (
@@ -116,27 +102,28 @@ var _ = BeforeSuite(func() {
 		testutils.NewCustomResourceDefinition("LogicalServer", "logicalservers", rpmv1.GroupVersion),
 		testutils.NewCustomResourceDefinition("MachineAlert", "machinealerts", rpmv1.GroupVersion),
 	}
-	if !isDockerTestSkip {
-		crdsInManagementCluster = append(crdsInManagementCluster,
-			testutils.NewCustomResourceDefinition("DockerMachine", "dockermachines", capdockerv1.GroupVersion),
-			testutils.NewCustomResourceDefinition("DockerMachineTemplate", "dockermachinetemplates", capdockerv1.GroupVersion),
-		)
-	}
 
 	By("adding scheme for additional packages", func() {
 		Expect(scalev1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 		Expect(rpmv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 		Expect(capdv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 		Expect(capiv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-		Expect(capdockerv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 	})
+
+	if !isDockerTestSkip {
+		crdsInManagementCluster = append(crdsInManagementCluster,
+			testutils.NewCustomResourceDefinition("DockerMachine", "dockermachines", capdockerv1.GroupVersion),
+			testutils.NewCustomResourceDefinition("DockerMachineTemplate", "dockermachinetemplates", capdockerv1.GroupVersion),
+		)
+		Expect(capdockerv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	}
 
 	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment", func() {
 		apiServer := &envtest.APIServer{}
 		apiServer.Configure().Append(
-			"runtime-config", "resource.k8s.io/v1alpha3=true", // enable DeviceTaintRule CRD
+			"runtime-config", "resource.k8s.io/v1beta2=true", // enable DeviceTaintRule CRD
 		)
 		testEnvWorkload = &envtest.Environment{
 			ControlPlane: envtest.ControlPlane{

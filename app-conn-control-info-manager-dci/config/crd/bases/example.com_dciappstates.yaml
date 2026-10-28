@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.17.2
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: dciappstates.example.com
 spec:
   group: example.com
@@ -37,7 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: DCIAppStateSpec defines the desired state of DCIAppState.
+            description: spec defines the desired state of DCIAppState
             properties:
               type:
                 enum:
@@ -48,12 +48,14 @@ spec:
             - type
             type: object
           status:
-            description: DCIAppStateStatus defines the observed state of DCIAppState.
+            description: status defines the observed state of DCIAppState
             properties:
               appStatus:
                 type: object
                 x-kubernetes-preserve-unknown-fields: true
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

@@ -1,17 +1,3 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package main
 
 import (
@@ -20,21 +6,23 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/converter"
 	"hash/fnv"
 	"io"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"temporal/shared"
 	"time"
+
+	workflowservice "go.temporal.io/api/workflowservice/v1"
+	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/converter"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 const maxRequestSize int64 = 10 * 1024 * 1024 // 10 MB
@@ -84,8 +72,9 @@ func shardedWorkflowID(podName string) string {
 
 // temporalClient is a narrow interface used by run for easier testing.
 type temporalClient interface {
-	SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg interface{}) error
-	QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...interface{}) (converter.EncodedValue, error)
+	SignalWorkflow(ctx context.Context, workflowID string, runID string, signalName string, arg any) error
+	QueryWorkflow(ctx context.Context, workflowID string, runID string, queryType string, args ...any) (converter.EncodedValue, error)
+	DescribeWorkflowExecution(ctx context.Context, workflowID, runID string) (*workflowservice.DescribeWorkflowExecutionResponse, error)
 	Close()
 }
 
@@ -94,7 +83,7 @@ type temporalClient interface {
 type bufferedSignal struct {
 	workflowID string
 	signalName string
-	arg        interface{}
+	arg        any
 }
 
 var (
@@ -105,6 +94,71 @@ var (
 // drainLoopInterval controls how often the drain loop retries buffered signals.
 // Exposed as a variable for testing.
 var drainLoopInterval = 200 * time.Millisecond
+
+const defaultWorkflowHealthCheckIntervalSec = 300 // 5 minutes
+
+func loadWorkflowHealthCheckInterval() time.Duration {
+	val := os.Getenv("WORKFLOW_HEALTH_CHECK_INTERVAL_SEC")
+	if val != "" {
+		if n, err := strconv.Atoi(val); err == nil && n > 0 {
+			klog.Infof("WORKFLOW_HEALTH_CHECK_INTERVAL_SEC=%d", n)
+			return time.Duration(n) * time.Second
+		}
+		klog.Warningf("Invalid WORKFLOW_HEALTH_CHECK_INTERVAL_SEC value %q, using default: %d", val, defaultWorkflowHealthCheckIntervalSec)
+	} else {
+		klog.Warningf("WORKFLOW_HEALTH_CHECK_INTERVAL_SEC is not set, using default: %d", defaultWorkflowHealthCheckIntervalSec)
+	}
+	return defaultWorkflowHealthCheckIntervalSec * time.Second
+}
+
+// workflowHealthCheckInterval controls how often each monitor-workflow's liveness
+// is verified. A failed check is logged at ERROR level so operators and Loki
+// alerts can detect a dead or stuck workflow.
+// Exposed as a variable for testing.
+var workflowHealthCheckInterval = loadWorkflowHealthCheckInterval()
+
+// checkWorkflowAlive describes the workflow execution and logs an ERROR if it
+// is no longer running (CloseTime is set). Unlike QueryWorkflow, DescribeWorkflow
+// always returns the actual execution status, even for terminated workflows.
+func checkWorkflowAlive(ctx context.Context, c temporalClient, workflowID string) {
+	resp, err := c.DescribeWorkflowExecution(ctx, workflowID, "")
+	if err != nil {
+		if ctx.Err() != nil {
+			return // gateway shutting down – suppress false alert
+		}
+		klog.Errorf("MonitorWorkflow health check error: workflow-id=%s err=%v", workflowID, err)
+		return
+	}
+	info := resp.WorkflowExecutionInfo
+	if info.CloseTime != nil {
+		// CloseTime being set means the workflow is no longer running
+		// (terminated, completed, failed, cancelled, timed out, continued-as-new).
+		// ContinueAsNew is excluded here because DescribeWorkflow with empty runID
+		// always returns the LATEST run, which is the new running execution.
+		klog.Errorf("MonitorWorkflow is NOT running: workflow-id=%s status=%v",
+			workflowID, resp.WorkflowExecutionInfo.Status)
+	}
+}
+
+// startWorkflowHealthCheckLoop starts a background goroutine that periodically
+// calls checkWorkflowAlive for every shard until ctx is cancelled.
+func startWorkflowHealthCheckLoop(ctx context.Context, c temporalClient) {
+	go func() {
+		ticker := time.NewTicker(workflowHealthCheckInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				for i := uint32(0); i < shardCount; i++ {
+					wfID := fmt.Sprintf("monitor-workflow-%d", i)
+					checkWorkflowAlive(ctx, c, wfID)
+				}
+			}
+		}
+	}()
+}
 
 // queryIsDraining queries the workflow for the "is-draining" state.
 // Returns true (draining) on any error so the caller buffers the signal safely.
@@ -125,7 +179,7 @@ func queryIsDraining(ctx context.Context, c temporalClient, workflowID string) b
 // bufferOrSignal sends the signal immediately when the workflow is not draining.
 // If the workflow is draining (or the query fails), the signal is placed in the
 // in-memory buffer and will be delivered by the drain loop once CaN is complete.
-func bufferOrSignal(ctx context.Context, c temporalClient, workflowID, signalName string, arg interface{}) error {
+func bufferOrSignal(ctx context.Context, c temporalClient, workflowID, signalName string, arg any) error {
 	if queryIsDraining(ctx, c, workflowID) {
 		signalBufMu.Lock()
 		if len(signalBuf) >= maxSignalBufSize {
@@ -277,6 +331,7 @@ func run() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	startDrainLoop(ctx, c)
+	startWorkflowHealthCheckLoop(ctx, c)
 
 	http.HandleFunc("/vector-signal", func(w http.ResponseWriter, r *http.Request) {
 		//debug
@@ -435,18 +490,23 @@ func run() {
 			}
 		}
 
-		var alertWorkflowID string
-		if len(alerts.Alerts) > 0 {
-			firstPod := alerts.Alerts[0].Labels.GetPod()
-			alertWorkflowID = shardedWorkflowID(firstPod)
-		} else {
-			alertWorkflowID = "monitor-workflow-0"
+		// Group alerts by target shard so each workflow receives only its own pods.
+		// This avoids wasted processing regardless of SHARD_COUNT.
+		shardBuckets := make(map[string]*shared.PodAlerts)
+		for _, alert := range alerts.Alerts {
+			pod := alert.Labels.GetPod()
+			wfID := shardedWorkflowID(pod)
+			if shardBuckets[wfID] == nil {
+				shardBuckets[wfID] = &shared.PodAlerts{}
+			}
+			shardBuckets[wfID].Alerts = append(shardBuckets[wfID].Alerts, alert)
 		}
-		klog.Infof("Routing alertmanager-signal to workflow: %s", alertWorkflowID)
-		err = bufferOrSignal(context.Background(), c, alertWorkflowID, "alertmanager-signal", alerts)
-		if err != nil {
-			klog.Errorf("Failed to signal workflow '%s': %v. Signal Name: 'alertmanager-signal'", alertWorkflowID, err)
-			return
+		klog.Infof("Routing alertmanager-signal: %d alerts split into %d shard(s)", len(alerts.Alerts), len(shardBuckets))
+		for wfID, bucket := range shardBuckets {
+			if err = bufferOrSignal(context.Background(), c, wfID, "alertmanager-signal", bucket); err != nil {
+				klog.Errorf("Failed to signal workflow '%s': %v. Signal Name: 'alertmanager-signal'", wfID, err)
+				return
+			}
 		}
 
 		n, writeErr := w.Write([]byte("Signal sent."))

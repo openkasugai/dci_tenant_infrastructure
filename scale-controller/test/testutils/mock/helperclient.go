@@ -13,15 +13,16 @@ import (
 	v1beta2 "cluster-api-provider-dci/api/v1beta2"
 	context "context"
 	reflect "reflect"
-	v10 "resource-pool-manager/api/v1"
+	v11 "resource-pool-manager/api/v1"
 	v1alpha1 "scale-controller/api/v1alpha1"
 
 	gomock "go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	v10 "k8s.io/api/resource/v1"
+	v1beta20 "k8s.io/api/resource/v1beta2"
 	types "k8s.io/apimachinery/pkg/types"
-	v1beta20 "sigs.k8s.io/cluster-api/api/core/v1beta2"
-	v1beta21 "sigs.k8s.io/cluster-api/test/infrastructure/docker/api/v1beta2"
+	v1beta21 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	v1beta22 "sigs.k8s.io/cluster-api/test/infrastructure/docker/api/v1beta2"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -78,7 +79,7 @@ func (mr *MockClientHelperMockRecorder) CreateDCIMachineTemplateFromNodeScalingR
 }
 
 // CreateDeviceTaintRule mocks base method.
-func (m *MockClientHelper) CreateDeviceTaintRule(ctx context.Context, deviceTaintRule *v1alpha3.DeviceTaintRule) error {
+func (m *MockClientHelper) CreateDeviceTaintRule(ctx context.Context, deviceTaintRule *v1beta20.DeviceTaintRule) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateDeviceTaintRule", ctx, deviceTaintRule)
 	ret0, _ := ret[0].(error)
@@ -120,7 +121,7 @@ func (mr *MockClientHelperMockRecorder) CreateDockerMachineTemplateFromNodeScali
 }
 
 // CreateMachineAlert mocks base method.
-func (m *MockClientHelper) CreateMachineAlert(ctx context.Context, machineAlert *v10.MachineAlert) error {
+func (m *MockClientHelper) CreateMachineAlert(ctx context.Context, machineAlert *v11.MachineAlert) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateMachineAlert", ctx, machineAlert)
 	ret0, _ := ret[0].(error)
@@ -134,7 +135,7 @@ func (mr *MockClientHelperMockRecorder) CreateMachineAlert(ctx, machineAlert any
 }
 
 // CreateMachineDeployment mocks base method.
-func (m *MockClientHelper) CreateMachineDeployment(ctx context.Context, machineDeployment *v1beta20.MachineDeployment) error {
+func (m *MockClientHelper) CreateMachineDeployment(ctx context.Context, machineDeployment *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateMachineDeployment", ctx, machineDeployment)
 	ret0, _ := ret[0].(error)
@@ -148,7 +149,7 @@ func (mr *MockClientHelperMockRecorder) CreateMachineDeployment(ctx, machineDepl
 }
 
 // CreateMachineDeploymentFromNodeScalingRequest mocks base method.
-func (m *MockClientHelper) CreateMachineDeploymentFromNodeScalingRequest(ctx context.Context, name, namespace, machineTemplateName string, nodeScalingRequest *v1alpha1.NodeScalingRequest, originalMachineDeployment *v1beta20.MachineDeployment) error {
+func (m *MockClientHelper) CreateMachineDeploymentFromNodeScalingRequest(ctx context.Context, name, namespace, machineTemplateName string, nodeScalingRequest *v1alpha1.NodeScalingRequest, originalMachineDeployment *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateMachineDeploymentFromNodeScalingRequest", ctx, name, namespace, machineTemplateName, nodeScalingRequest, originalMachineDeployment)
 	ret0, _ := ret[0].(error)
@@ -176,7 +177,7 @@ func (mr *MockClientHelperMockRecorder) DeleteDCIMachineTemplate(ctx, dciMachine
 }
 
 // DeleteDCIMachineTemplateUnused mocks base method.
-func (m *MockClientHelper) DeleteDCIMachineTemplateUnused(ctx context.Context, md *v1beta20.MachineDeployment) error {
+func (m *MockClientHelper) DeleteDCIMachineTemplateUnused(ctx context.Context, md *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteDCIMachineTemplateUnused", ctx, md)
 	ret0, _ := ret[0].(error)
@@ -190,7 +191,7 @@ func (mr *MockClientHelperMockRecorder) DeleteDCIMachineTemplateUnused(ctx, md a
 }
 
 // DeleteDockerMachineTemplate mocks base method.
-func (m *MockClientHelper) DeleteDockerMachineTemplate(ctx context.Context, dockerMachineTemplate *v1beta21.DockerMachineTemplate) error {
+func (m *MockClientHelper) DeleteDockerMachineTemplate(ctx context.Context, dockerMachineTemplate *v1beta22.DockerMachineTemplate) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteDockerMachineTemplate", ctx, dockerMachineTemplate)
 	ret0, _ := ret[0].(error)
@@ -204,7 +205,7 @@ func (mr *MockClientHelperMockRecorder) DeleteDockerMachineTemplate(ctx, dockerM
 }
 
 // DeleteDockerMachineTemplateUnused mocks base method.
-func (m *MockClientHelper) DeleteDockerMachineTemplateUnused(ctx context.Context, md *v1beta20.MachineDeployment) error {
+func (m *MockClientHelper) DeleteDockerMachineTemplateUnused(ctx context.Context, md *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteDockerMachineTemplateUnused", ctx, md)
 	ret0, _ := ret[0].(error)
@@ -218,7 +219,7 @@ func (mr *MockClientHelperMockRecorder) DeleteDockerMachineTemplateUnused(ctx, m
 }
 
 // DeleteMachine mocks base method.
-func (m *MockClientHelper) DeleteMachine(ctx context.Context, machine *v1beta20.Machine) error {
+func (m *MockClientHelper) DeleteMachine(ctx context.Context, machine *v1beta21.Machine) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteMachine", ctx, machine)
 	ret0, _ := ret[0].(error)
@@ -232,7 +233,7 @@ func (mr *MockClientHelperMockRecorder) DeleteMachine(ctx, machine any) *gomock.
 }
 
 // DeleteMachineAlert mocks base method.
-func (m *MockClientHelper) DeleteMachineAlert(ctx context.Context, machineAlert *v10.MachineAlert) error {
+func (m *MockClientHelper) DeleteMachineAlert(ctx context.Context, machineAlert *v11.MachineAlert) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteMachineAlert", ctx, machineAlert)
 	ret0, _ := ret[0].(error)
@@ -246,7 +247,7 @@ func (mr *MockClientHelperMockRecorder) DeleteMachineAlert(ctx, machineAlert any
 }
 
 // DeleteMachineDeployment mocks base method.
-func (m *MockClientHelper) DeleteMachineDeployment(ctx context.Context, machineDeployment *v1beta20.MachineDeployment) error {
+func (m *MockClientHelper) DeleteMachineDeployment(ctx context.Context, machineDeployment *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteMachineDeployment", ctx, machineDeployment)
 	ret0, _ := ret[0].(error)
@@ -307,7 +308,7 @@ func (mr *MockClientHelperMockRecorder) GetDCIMachine(ctx, dciMachineName, names
 }
 
 // GetDCIMachineFromMachine mocks base method.
-func (m *MockClientHelper) GetDCIMachineFromMachine(ctx context.Context, machine *v1beta20.Machine, namespace string) (*v1beta2.DCIMachine, error) {
+func (m *MockClientHelper) GetDCIMachineFromMachine(ctx context.Context, machine *v1beta21.Machine, namespace string) (*v1beta2.DCIMachine, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDCIMachineFromMachine", ctx, machine, namespace)
 	ret0, _ := ret[0].(*v1beta2.DCIMachine)
@@ -337,7 +338,7 @@ func (mr *MockClientHelperMockRecorder) GetDCIMachineTemplate(ctx, dciMachineTem
 }
 
 // GetDCIMachineTemplateFromMachineDeployment mocks base method.
-func (m *MockClientHelper) GetDCIMachineTemplateFromMachineDeployment(ctx context.Context, machineDeployment *v1beta20.MachineDeployment, namespace string) (*v1beta2.DCIMachineTemplate, error) {
+func (m *MockClientHelper) GetDCIMachineTemplateFromMachineDeployment(ctx context.Context, machineDeployment *v1beta21.MachineDeployment, namespace string) (*v1beta2.DCIMachineTemplate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDCIMachineTemplateFromMachineDeployment", ctx, machineDeployment, namespace)
 	ret0, _ := ret[0].(*v1beta2.DCIMachineTemplate)
@@ -352,7 +353,7 @@ func (mr *MockClientHelperMockRecorder) GetDCIMachineTemplateFromMachineDeployme
 }
 
 // GetDCIMachineTemplatesAllocatable mocks base method.
-func (m *MockClientHelper) GetDCIMachineTemplatesAllocatable(ctx context.Context, location *string, serverSpec *v10.ServerSpec, namespace string) ([]client.Object, string, error) {
+func (m *MockClientHelper) GetDCIMachineTemplatesAllocatable(ctx context.Context, location *string, serverSpec *v11.ServerSpec, namespace string) ([]client.Object, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDCIMachineTemplatesAllocatable", ctx, location, serverSpec, namespace)
 	ret0, _ := ret[0].([]client.Object)
@@ -368,7 +369,7 @@ func (mr *MockClientHelperMockRecorder) GetDCIMachineTemplatesAllocatable(ctx, l
 }
 
 // GetDCIMachineTemplatesValid mocks base method.
-func (m *MockClientHelper) GetDCIMachineTemplatesValid(ctx context.Context, location *string, serverSpec *v10.ServerSpec, namespace string) ([]client.Object, string, error) {
+func (m *MockClientHelper) GetDCIMachineTemplatesValid(ctx context.Context, location *string, serverSpec *v11.ServerSpec, namespace string) ([]client.Object, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDCIMachineTemplatesValid", ctx, location, serverSpec, namespace)
 	ret0, _ := ret[0].([]client.Object)
@@ -384,10 +385,10 @@ func (mr *MockClientHelperMockRecorder) GetDCIMachineTemplatesValid(ctx, locatio
 }
 
 // GetDockerMachineTemplate mocks base method.
-func (m *MockClientHelper) GetDockerMachineTemplate(ctx context.Context, dockerMachineTemplateName, namespace string) (*v1beta21.DockerMachineTemplate, error) {
+func (m *MockClientHelper) GetDockerMachineTemplate(ctx context.Context, dockerMachineTemplateName, namespace string) (*v1beta22.DockerMachineTemplate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDockerMachineTemplate", ctx, dockerMachineTemplateName, namespace)
-	ret0, _ := ret[0].(*v1beta21.DockerMachineTemplate)
+	ret0, _ := ret[0].(*v1beta22.DockerMachineTemplate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -415,10 +416,10 @@ func (mr *MockClientHelperMockRecorder) GetDockerMachineTemplatesAllocatable(ctx
 }
 
 // GetLogicalServer mocks base method.
-func (m *MockClientHelper) GetLogicalServer(ctx context.Context, name, namespace string) (*v10.LogicalServer, error) {
+func (m *MockClientHelper) GetLogicalServer(ctx context.Context, name, namespace string) (*v11.LogicalServer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogicalServer", ctx, name, namespace)
-	ret0, _ := ret[0].(*v10.LogicalServer)
+	ret0, _ := ret[0].(*v11.LogicalServer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -430,10 +431,10 @@ func (mr *MockClientHelperMockRecorder) GetLogicalServer(ctx, name, namespace an
 }
 
 // GetLogicalServerFromDCIMachine mocks base method.
-func (m *MockClientHelper) GetLogicalServerFromDCIMachine(ctx context.Context, dciMachine *v1beta2.DCIMachine) (*v10.LogicalServer, error) {
+func (m *MockClientHelper) GetLogicalServerFromDCIMachine(ctx context.Context, dciMachine *v1beta2.DCIMachine) (*v11.LogicalServer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogicalServerFromDCIMachine", ctx, dciMachine)
-	ret0, _ := ret[0].(*v10.LogicalServer)
+	ret0, _ := ret[0].(*v11.LogicalServer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -461,10 +462,10 @@ func (mr *MockClientHelperMockRecorder) GetLogicalServerNameAndNamespaceFromDCIM
 }
 
 // GetMachine mocks base method.
-func (m *MockClientHelper) GetMachine(ctx context.Context, name, namespace string) (*v1beta20.Machine, error) {
+func (m *MockClientHelper) GetMachine(ctx context.Context, name, namespace string) (*v1beta21.Machine, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachine", ctx, name, namespace)
-	ret0, _ := ret[0].(*v1beta20.Machine)
+	ret0, _ := ret[0].(*v1beta21.Machine)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -476,10 +477,10 @@ func (mr *MockClientHelperMockRecorder) GetMachine(ctx, name, namespace any) *go
 }
 
 // GetMachineAlert mocks base method.
-func (m *MockClientHelper) GetMachineAlert(ctx context.Context, name, namespace string) (*v10.MachineAlert, error) {
+func (m *MockClientHelper) GetMachineAlert(ctx context.Context, name, namespace string) (*v11.MachineAlert, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineAlert", ctx, name, namespace)
-	ret0, _ := ret[0].(*v10.MachineAlert)
+	ret0, _ := ret[0].(*v11.MachineAlert)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -491,10 +492,10 @@ func (mr *MockClientHelperMockRecorder) GetMachineAlert(ctx, name, namespace any
 }
 
 // GetMachineDeployment mocks base method.
-func (m *MockClientHelper) GetMachineDeployment(ctx context.Context, name, namespace string) (*v1beta20.MachineDeployment, error) {
+func (m *MockClientHelper) GetMachineDeployment(ctx context.Context, name, namespace string) (*v1beta21.MachineDeployment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineDeployment", ctx, name, namespace)
-	ret0, _ := ret[0].(*v1beta20.MachineDeployment)
+	ret0, _ := ret[0].(*v1beta21.MachineDeployment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -506,10 +507,10 @@ func (mr *MockClientHelperMockRecorder) GetMachineDeployment(ctx, name, namespac
 }
 
 // GetMachineDeploymentFromMachine mocks base method.
-func (m *MockClientHelper) GetMachineDeploymentFromMachine(ctx context.Context, machine *v1beta20.Machine, namespace string) (*v1beta20.MachineDeployment, error) {
+func (m *MockClientHelper) GetMachineDeploymentFromMachine(ctx context.Context, machine *v1beta21.Machine, namespace string) (*v1beta21.MachineDeployment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineDeploymentFromMachine", ctx, machine, namespace)
-	ret0, _ := ret[0].(*v1beta20.MachineDeployment)
+	ret0, _ := ret[0].(*v1beta21.MachineDeployment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -521,12 +522,12 @@ func (mr *MockClientHelperMockRecorder) GetMachineDeploymentFromMachine(ctx, mac
 }
 
 // GetMachineDeploymentsAllocatable mocks base method.
-func (m *MockClientHelper) GetMachineDeploymentsAllocatable(ctx context.Context, namespace, machineTemplateType, clusterName string, machineTemplates []client.Object) ([]v1beta20.MachineDeployment, string, *v1beta20.MachineDeployment, error) {
+func (m *MockClientHelper) GetMachineDeploymentsAllocatable(ctx context.Context, namespace, machineTemplateType, clusterName string, machineTemplates []client.Object) ([]v1beta21.MachineDeployment, string, *v1beta21.MachineDeployment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineDeploymentsAllocatable", ctx, namespace, machineTemplateType, clusterName, machineTemplates)
-	ret0, _ := ret[0].([]v1beta20.MachineDeployment)
+	ret0, _ := ret[0].([]v1beta21.MachineDeployment)
 	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(*v1beta20.MachineDeployment)
+	ret2, _ := ret[2].(*v1beta21.MachineDeployment)
 	ret3, _ := ret[3].(error)
 	return ret0, ret1, ret2, ret3
 }
@@ -538,10 +539,10 @@ func (mr *MockClientHelperMockRecorder) GetMachineDeploymentsAllocatable(ctx, na
 }
 
 // GetMachineDeploymentsFromTemplate mocks base method.
-func (m *MockClientHelper) GetMachineDeploymentsFromTemplate(ctx context.Context, namespace string, md *v1beta20.MachineDeployment, machineTemplate client.Object) ([]v1beta20.MachineDeployment, error) {
+func (m *MockClientHelper) GetMachineDeploymentsFromTemplate(ctx context.Context, namespace string, md *v1beta21.MachineDeployment, machineTemplate client.Object) ([]v1beta21.MachineDeployment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineDeploymentsFromTemplate", ctx, namespace, md, machineTemplate)
-	ret0, _ := ret[0].([]v1beta20.MachineDeployment)
+	ret0, _ := ret[0].([]v1beta21.MachineDeployment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -553,10 +554,10 @@ func (mr *MockClientHelperMockRecorder) GetMachineDeploymentsFromTemplate(ctx, n
 }
 
 // GetMachineFromNode mocks base method.
-func (m *MockClientHelper) GetMachineFromNode(ctx context.Context, node *v1.Node) (*v1beta20.Machine, error) {
+func (m *MockClientHelper) GetMachineFromNode(ctx context.Context, node *v1.Node) (*v1beta21.Machine, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineFromNode", ctx, node)
-	ret0, _ := ret[0].(*v1beta20.Machine)
+	ret0, _ := ret[0].(*v1beta21.Machine)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -568,10 +569,10 @@ func (mr *MockClientHelperMockRecorder) GetMachineFromNode(ctx, node any) *gomoc
 }
 
 // GetMachineSetFromUID mocks base method.
-func (m *MockClientHelper) GetMachineSetFromUID(ctx context.Context, namespace string, machineDeploymentUID types.UID) (*v1beta20.MachineSet, error) {
+func (m *MockClientHelper) GetMachineSetFromUID(ctx context.Context, namespace string, machineDeploymentUID types.UID) (*v1beta21.MachineSet, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineSetFromUID", ctx, namespace, machineDeploymentUID)
-	ret0, _ := ret[0].(*v1beta20.MachineSet)
+	ret0, _ := ret[0].(*v1beta21.MachineSet)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -598,7 +599,7 @@ func (mr *MockClientHelperMockRecorder) GetNode(ctx, nodeName any) *gomock.Call 
 }
 
 // IsAutoScalingEnabledMachineDeployment mocks base method.
-func (m *MockClientHelper) IsAutoScalingEnabledMachineDeployment(md *v1beta20.MachineDeployment) bool {
+func (m *MockClientHelper) IsAutoScalingEnabledMachineDeployment(md *v1beta21.MachineDeployment) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsAutoScalingEnabledMachineDeployment", md)
 	ret0, _ := ret[0].(bool)
@@ -612,7 +613,7 @@ func (mr *MockClientHelperMockRecorder) IsAutoScalingEnabledMachineDeployment(md
 }
 
 // IsLastMachineDeployment mocks base method.
-func (m *MockClientHelper) IsLastMachineDeployment(ctx context.Context, machineDeployment *v1beta20.MachineDeployment, namespace, clusterName string) (bool, error) {
+func (m *MockClientHelper) IsLastMachineDeployment(ctx context.Context, machineDeployment *v1beta21.MachineDeployment, namespace, clusterName string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsLastMachineDeployment", ctx, machineDeployment, namespace, clusterName)
 	ret0, _ := ret[0].(bool)
@@ -627,7 +628,7 @@ func (mr *MockClientHelperMockRecorder) IsLastMachineDeployment(ctx, machineDepl
 }
 
 // IsReferredDCIMachineTemplate mocks base method.
-func (m *MockClientHelper) IsReferredDCIMachineTemplate(ctx context.Context, dciMachineTemplate *v1beta2.DCIMachineTemplate, machineDeployment *v1beta20.MachineDeployment, namespace string) (bool, error) {
+func (m *MockClientHelper) IsReferredDCIMachineTemplate(ctx context.Context, dciMachineTemplate *v1beta2.DCIMachineTemplate, machineDeployment *v1beta21.MachineDeployment, namespace string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsReferredDCIMachineTemplate", ctx, dciMachineTemplate, machineDeployment, namespace)
 	ret0, _ := ret[0].(bool)
@@ -642,7 +643,7 @@ func (mr *MockClientHelperMockRecorder) IsReferredDCIMachineTemplate(ctx, dciMac
 }
 
 // IsReferredDockerMachineTemplate mocks base method.
-func (m *MockClientHelper) IsReferredDockerMachineTemplate(ctx context.Context, dockerMachineTemplate *v1beta21.DockerMachineTemplate, machineDeployment *v1beta20.MachineDeployment, namespace string) (bool, error) {
+func (m *MockClientHelper) IsReferredDockerMachineTemplate(ctx context.Context, dockerMachineTemplate *v1beta22.DockerMachineTemplate, machineDeployment *v1beta21.MachineDeployment, namespace string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsReferredDockerMachineTemplate", ctx, dockerMachineTemplate, machineDeployment, namespace)
 	ret0, _ := ret[0].(bool)
@@ -657,25 +658,25 @@ func (mr *MockClientHelperMockRecorder) IsReferredDockerMachineTemplate(ctx, doc
 }
 
 // ListDeviceTaintRule mocks base method.
-func (m *MockClientHelper) ListDeviceTaintRule(ctx context.Context, namespace string) (*v1alpha3.DeviceTaintRuleList, error) {
+func (m *MockClientHelper) ListDeviceTaintRule(ctx context.Context) (*v1beta20.DeviceTaintRuleList, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListDeviceTaintRule", ctx, namespace)
-	ret0, _ := ret[0].(*v1alpha3.DeviceTaintRuleList)
+	ret := m.ctrl.Call(m, "ListDeviceTaintRule", ctx)
+	ret0, _ := ret[0].(*v1beta20.DeviceTaintRuleList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListDeviceTaintRule indicates an expected call of ListDeviceTaintRule.
-func (mr *MockClientHelperMockRecorder) ListDeviceTaintRule(ctx, namespace any) *gomock.Call {
+func (mr *MockClientHelperMockRecorder) ListDeviceTaintRule(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDeviceTaintRule", reflect.TypeOf((*MockClientHelper)(nil).ListDeviceTaintRule), ctx, namespace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDeviceTaintRule", reflect.TypeOf((*MockClientHelper)(nil).ListDeviceTaintRule), ctx)
 }
 
 // ListMachineAlert mocks base method.
-func (m *MockClientHelper) ListMachineAlert(ctx context.Context, namespace string) (*v10.MachineAlertList, error) {
+func (m *MockClientHelper) ListMachineAlert(ctx context.Context, namespace string) (*v11.MachineAlertList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListMachineAlert", ctx, namespace)
-	ret0, _ := ret[0].(*v10.MachineAlertList)
+	ret0, _ := ret[0].(*v11.MachineAlertList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -684,6 +685,21 @@ func (m *MockClientHelper) ListMachineAlert(ctx context.Context, namespace strin
 func (mr *MockClientHelperMockRecorder) ListMachineAlert(ctx, namespace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMachineAlert", reflect.TypeOf((*MockClientHelper)(nil).ListMachineAlert), ctx, namespace)
+}
+
+// ListResourceSlice mocks base method.
+func (m *MockClientHelper) ListResourceSlice(ctx context.Context) (*v10.ResourceSliceList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListResourceSlice", ctx)
+	ret0, _ := ret[0].(*v10.ResourceSliceList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListResourceSlice indicates an expected call of ListResourceSlice.
+func (mr *MockClientHelperMockRecorder) ListResourceSlice(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListResourceSlice", reflect.TypeOf((*MockClientHelper)(nil).ListResourceSlice), ctx)
 }
 
 // PatchDCIMachine mocks base method.
@@ -701,7 +717,7 @@ func (mr *MockClientHelperMockRecorder) PatchDCIMachine(ctx, dciMachine, lastDCI
 }
 
 // PatchMachineDeployment mocks base method.
-func (m *MockClientHelper) PatchMachineDeployment(ctx context.Context, machineDeployment, lastMachineDeployment *v1beta20.MachineDeployment) error {
+func (m *MockClientHelper) PatchMachineDeployment(ctx context.Context, machineDeployment, lastMachineDeployment *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PatchMachineDeployment", ctx, machineDeployment, lastMachineDeployment)
 	ret0, _ := ret[0].(error)
@@ -715,7 +731,7 @@ func (mr *MockClientHelperMockRecorder) PatchMachineDeployment(ctx, machineDeplo
 }
 
 // PatchMachineSet mocks base method.
-func (m *MockClientHelper) PatchMachineSet(ctx context.Context, machineSet, lastMachineSet *v1beta20.MachineSet) error {
+func (m *MockClientHelper) PatchMachineSet(ctx context.Context, machineSet, lastMachineSet *v1beta21.MachineSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PatchMachineSet", ctx, machineSet, lastMachineSet)
 	ret0, _ := ret[0].(error)
@@ -768,7 +784,7 @@ func (mr *MockClientDCIMachineHelperMockRecorder) GetDCIMachine(ctx, dciMachineN
 }
 
 // GetDCIMachineFromMachine mocks base method.
-func (m *MockClientDCIMachineHelper) GetDCIMachineFromMachine(ctx context.Context, machine *v1beta20.Machine, namespace string) (*v1beta2.DCIMachine, error) {
+func (m *MockClientDCIMachineHelper) GetDCIMachineFromMachine(ctx context.Context, machine *v1beta21.Machine, namespace string) (*v1beta2.DCIMachine, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDCIMachineFromMachine", ctx, machine, namespace)
 	ret0, _ := ret[0].(*v1beta2.DCIMachine)
@@ -863,7 +879,7 @@ func (mr *MockClientDCIMachineTemplateHelperMockRecorder) DeleteDCIMachineTempla
 }
 
 // DeleteDCIMachineTemplateUnused mocks base method.
-func (m *MockClientDCIMachineTemplateHelper) DeleteDCIMachineTemplateUnused(ctx context.Context, md *v1beta20.MachineDeployment) error {
+func (m *MockClientDCIMachineTemplateHelper) DeleteDCIMachineTemplateUnused(ctx context.Context, md *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteDCIMachineTemplateUnused", ctx, md)
 	ret0, _ := ret[0].(error)
@@ -892,7 +908,7 @@ func (mr *MockClientDCIMachineTemplateHelperMockRecorder) GetDCIMachineTemplate(
 }
 
 // GetDCIMachineTemplateFromMachineDeployment mocks base method.
-func (m *MockClientDCIMachineTemplateHelper) GetDCIMachineTemplateFromMachineDeployment(ctx context.Context, machineDeployment *v1beta20.MachineDeployment, namespace string) (*v1beta2.DCIMachineTemplate, error) {
+func (m *MockClientDCIMachineTemplateHelper) GetDCIMachineTemplateFromMachineDeployment(ctx context.Context, machineDeployment *v1beta21.MachineDeployment, namespace string) (*v1beta2.DCIMachineTemplate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDCIMachineTemplateFromMachineDeployment", ctx, machineDeployment, namespace)
 	ret0, _ := ret[0].(*v1beta2.DCIMachineTemplate)
@@ -907,7 +923,7 @@ func (mr *MockClientDCIMachineTemplateHelperMockRecorder) GetDCIMachineTemplateF
 }
 
 // GetDCIMachineTemplatesAllocatable mocks base method.
-func (m *MockClientDCIMachineTemplateHelper) GetDCIMachineTemplatesAllocatable(ctx context.Context, location *string, serverSpec *v10.ServerSpec, namespace string) ([]client.Object, string, error) {
+func (m *MockClientDCIMachineTemplateHelper) GetDCIMachineTemplatesAllocatable(ctx context.Context, location *string, serverSpec *v11.ServerSpec, namespace string) ([]client.Object, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDCIMachineTemplatesAllocatable", ctx, location, serverSpec, namespace)
 	ret0, _ := ret[0].([]client.Object)
@@ -923,7 +939,7 @@ func (mr *MockClientDCIMachineTemplateHelperMockRecorder) GetDCIMachineTemplates
 }
 
 // GetDCIMachineTemplatesValid mocks base method.
-func (m *MockClientDCIMachineTemplateHelper) GetDCIMachineTemplatesValid(ctx context.Context, location *string, serverSpec *v10.ServerSpec, namespace string) ([]client.Object, string, error) {
+func (m *MockClientDCIMachineTemplateHelper) GetDCIMachineTemplatesValid(ctx context.Context, location *string, serverSpec *v11.ServerSpec, namespace string) ([]client.Object, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDCIMachineTemplatesValid", ctx, location, serverSpec, namespace)
 	ret0, _ := ret[0].([]client.Object)
@@ -939,7 +955,7 @@ func (mr *MockClientDCIMachineTemplateHelperMockRecorder) GetDCIMachineTemplates
 }
 
 // IsReferredDCIMachineTemplate mocks base method.
-func (m *MockClientDCIMachineTemplateHelper) IsReferredDCIMachineTemplate(ctx context.Context, dciMachineTemplate *v1beta2.DCIMachineTemplate, machineDeployment *v1beta20.MachineDeployment, namespace string) (bool, error) {
+func (m *MockClientDCIMachineTemplateHelper) IsReferredDCIMachineTemplate(ctx context.Context, dciMachineTemplate *v1beta2.DCIMachineTemplate, machineDeployment *v1beta21.MachineDeployment, namespace string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsReferredDCIMachineTemplate", ctx, dciMachineTemplate, machineDeployment, namespace)
 	ret0, _ := ret[0].(bool)
@@ -1006,7 +1022,7 @@ func (mr *MockClientDockerMachineTemplateHelperMockRecorder) CreateDockerMachine
 }
 
 // DeleteDockerMachineTemplate mocks base method.
-func (m *MockClientDockerMachineTemplateHelper) DeleteDockerMachineTemplate(ctx context.Context, dockerMachineTemplate *v1beta21.DockerMachineTemplate) error {
+func (m *MockClientDockerMachineTemplateHelper) DeleteDockerMachineTemplate(ctx context.Context, dockerMachineTemplate *v1beta22.DockerMachineTemplate) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteDockerMachineTemplate", ctx, dockerMachineTemplate)
 	ret0, _ := ret[0].(error)
@@ -1020,7 +1036,7 @@ func (mr *MockClientDockerMachineTemplateHelperMockRecorder) DeleteDockerMachine
 }
 
 // DeleteDockerMachineTemplateUnused mocks base method.
-func (m *MockClientDockerMachineTemplateHelper) DeleteDockerMachineTemplateUnused(ctx context.Context, md *v1beta20.MachineDeployment) error {
+func (m *MockClientDockerMachineTemplateHelper) DeleteDockerMachineTemplateUnused(ctx context.Context, md *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteDockerMachineTemplateUnused", ctx, md)
 	ret0, _ := ret[0].(error)
@@ -1034,10 +1050,10 @@ func (mr *MockClientDockerMachineTemplateHelperMockRecorder) DeleteDockerMachine
 }
 
 // GetDockerMachineTemplate mocks base method.
-func (m *MockClientDockerMachineTemplateHelper) GetDockerMachineTemplate(ctx context.Context, dockerMachineTemplateName, namespace string) (*v1beta21.DockerMachineTemplate, error) {
+func (m *MockClientDockerMachineTemplateHelper) GetDockerMachineTemplate(ctx context.Context, dockerMachineTemplateName, namespace string) (*v1beta22.DockerMachineTemplate, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetDockerMachineTemplate", ctx, dockerMachineTemplateName, namespace)
-	ret0, _ := ret[0].(*v1beta21.DockerMachineTemplate)
+	ret0, _ := ret[0].(*v1beta22.DockerMachineTemplate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1065,7 +1081,7 @@ func (mr *MockClientDockerMachineTemplateHelperMockRecorder) GetDockerMachineTem
 }
 
 // IsReferredDockerMachineTemplate mocks base method.
-func (m *MockClientDockerMachineTemplateHelper) IsReferredDockerMachineTemplate(ctx context.Context, dockerMachineTemplate *v1beta21.DockerMachineTemplate, machineDeployment *v1beta20.MachineDeployment, namespace string) (bool, error) {
+func (m *MockClientDockerMachineTemplateHelper) IsReferredDockerMachineTemplate(ctx context.Context, dockerMachineTemplate *v1beta22.DockerMachineTemplate, machineDeployment *v1beta21.MachineDeployment, namespace string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsReferredDockerMachineTemplate", ctx, dockerMachineTemplate, machineDeployment, namespace)
 	ret0, _ := ret[0].(bool)
@@ -1104,7 +1120,7 @@ func (m *MockClientMachineHelper) EXPECT() *MockClientMachineHelperMockRecorder 
 }
 
 // DeleteMachine mocks base method.
-func (m *MockClientMachineHelper) DeleteMachine(ctx context.Context, machine *v1beta20.Machine) error {
+func (m *MockClientMachineHelper) DeleteMachine(ctx context.Context, machine *v1beta21.Machine) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteMachine", ctx, machine)
 	ret0, _ := ret[0].(error)
@@ -1118,10 +1134,10 @@ func (mr *MockClientMachineHelperMockRecorder) DeleteMachine(ctx, machine any) *
 }
 
 // GetMachine mocks base method.
-func (m *MockClientMachineHelper) GetMachine(ctx context.Context, name, namespace string) (*v1beta20.Machine, error) {
+func (m *MockClientMachineHelper) GetMachine(ctx context.Context, name, namespace string) (*v1beta21.Machine, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachine", ctx, name, namespace)
-	ret0, _ := ret[0].(*v1beta20.Machine)
+	ret0, _ := ret[0].(*v1beta21.Machine)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1133,10 +1149,10 @@ func (mr *MockClientMachineHelperMockRecorder) GetMachine(ctx, name, namespace a
 }
 
 // GetMachineFromNode mocks base method.
-func (m *MockClientMachineHelper) GetMachineFromNode(ctx context.Context, node *v1.Node) (*v1beta20.Machine, error) {
+func (m *MockClientMachineHelper) GetMachineFromNode(ctx context.Context, node *v1.Node) (*v1beta21.Machine, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineFromNode", ctx, node)
-	ret0, _ := ret[0].(*v1beta20.Machine)
+	ret0, _ := ret[0].(*v1beta21.Machine)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1172,7 +1188,7 @@ func (m *MockClientMachineDeploymentHelper) EXPECT() *MockClientMachineDeploymen
 }
 
 // CreateMachineDeployment mocks base method.
-func (m *MockClientMachineDeploymentHelper) CreateMachineDeployment(ctx context.Context, machineDeployment *v1beta20.MachineDeployment) error {
+func (m *MockClientMachineDeploymentHelper) CreateMachineDeployment(ctx context.Context, machineDeployment *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateMachineDeployment", ctx, machineDeployment)
 	ret0, _ := ret[0].(error)
@@ -1186,7 +1202,7 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) CreateMachineDeployment
 }
 
 // CreateMachineDeploymentFromNodeScalingRequest mocks base method.
-func (m *MockClientMachineDeploymentHelper) CreateMachineDeploymentFromNodeScalingRequest(ctx context.Context, name, namespace, machineTemplateName string, nodeScalingRequest *v1alpha1.NodeScalingRequest, originalMachineDeployment *v1beta20.MachineDeployment) error {
+func (m *MockClientMachineDeploymentHelper) CreateMachineDeploymentFromNodeScalingRequest(ctx context.Context, name, namespace, machineTemplateName string, nodeScalingRequest *v1alpha1.NodeScalingRequest, originalMachineDeployment *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateMachineDeploymentFromNodeScalingRequest", ctx, name, namespace, machineTemplateName, nodeScalingRequest, originalMachineDeployment)
 	ret0, _ := ret[0].(error)
@@ -1200,7 +1216,7 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) CreateMachineDeployment
 }
 
 // DeleteMachineDeployment mocks base method.
-func (m *MockClientMachineDeploymentHelper) DeleteMachineDeployment(ctx context.Context, machineDeployment *v1beta20.MachineDeployment) error {
+func (m *MockClientMachineDeploymentHelper) DeleteMachineDeployment(ctx context.Context, machineDeployment *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteMachineDeployment", ctx, machineDeployment)
 	ret0, _ := ret[0].(error)
@@ -1214,10 +1230,10 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) DeleteMachineDeployment
 }
 
 // GetMachineDeployment mocks base method.
-func (m *MockClientMachineDeploymentHelper) GetMachineDeployment(ctx context.Context, name, namespace string) (*v1beta20.MachineDeployment, error) {
+func (m *MockClientMachineDeploymentHelper) GetMachineDeployment(ctx context.Context, name, namespace string) (*v1beta21.MachineDeployment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineDeployment", ctx, name, namespace)
-	ret0, _ := ret[0].(*v1beta20.MachineDeployment)
+	ret0, _ := ret[0].(*v1beta21.MachineDeployment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1229,10 +1245,10 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) GetMachineDeployment(ct
 }
 
 // GetMachineDeploymentFromMachine mocks base method.
-func (m *MockClientMachineDeploymentHelper) GetMachineDeploymentFromMachine(ctx context.Context, machine *v1beta20.Machine, namespace string) (*v1beta20.MachineDeployment, error) {
+func (m *MockClientMachineDeploymentHelper) GetMachineDeploymentFromMachine(ctx context.Context, machine *v1beta21.Machine, namespace string) (*v1beta21.MachineDeployment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineDeploymentFromMachine", ctx, machine, namespace)
-	ret0, _ := ret[0].(*v1beta20.MachineDeployment)
+	ret0, _ := ret[0].(*v1beta21.MachineDeployment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1244,12 +1260,12 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) GetMachineDeploymentFro
 }
 
 // GetMachineDeploymentsAllocatable mocks base method.
-func (m *MockClientMachineDeploymentHelper) GetMachineDeploymentsAllocatable(ctx context.Context, namespace, machineTemplateType, clusterName string, machineTemplates []client.Object) ([]v1beta20.MachineDeployment, string, *v1beta20.MachineDeployment, error) {
+func (m *MockClientMachineDeploymentHelper) GetMachineDeploymentsAllocatable(ctx context.Context, namespace, machineTemplateType, clusterName string, machineTemplates []client.Object) ([]v1beta21.MachineDeployment, string, *v1beta21.MachineDeployment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineDeploymentsAllocatable", ctx, namespace, machineTemplateType, clusterName, machineTemplates)
-	ret0, _ := ret[0].([]v1beta20.MachineDeployment)
+	ret0, _ := ret[0].([]v1beta21.MachineDeployment)
 	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(*v1beta20.MachineDeployment)
+	ret2, _ := ret[2].(*v1beta21.MachineDeployment)
 	ret3, _ := ret[3].(error)
 	return ret0, ret1, ret2, ret3
 }
@@ -1261,10 +1277,10 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) GetMachineDeploymentsAl
 }
 
 // GetMachineDeploymentsFromTemplate mocks base method.
-func (m *MockClientMachineDeploymentHelper) GetMachineDeploymentsFromTemplate(ctx context.Context, namespace string, md *v1beta20.MachineDeployment, machineTemplate client.Object) ([]v1beta20.MachineDeployment, error) {
+func (m *MockClientMachineDeploymentHelper) GetMachineDeploymentsFromTemplate(ctx context.Context, namespace string, md *v1beta21.MachineDeployment, machineTemplate client.Object) ([]v1beta21.MachineDeployment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineDeploymentsFromTemplate", ctx, namespace, md, machineTemplate)
-	ret0, _ := ret[0].([]v1beta20.MachineDeployment)
+	ret0, _ := ret[0].([]v1beta21.MachineDeployment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1276,7 +1292,7 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) GetMachineDeploymentsFr
 }
 
 // IsAutoScalingEnabledMachineDeployment mocks base method.
-func (m *MockClientMachineDeploymentHelper) IsAutoScalingEnabledMachineDeployment(md *v1beta20.MachineDeployment) bool {
+func (m *MockClientMachineDeploymentHelper) IsAutoScalingEnabledMachineDeployment(md *v1beta21.MachineDeployment) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsAutoScalingEnabledMachineDeployment", md)
 	ret0, _ := ret[0].(bool)
@@ -1290,7 +1306,7 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) IsAutoScalingEnabledMac
 }
 
 // IsLastMachineDeployment mocks base method.
-func (m *MockClientMachineDeploymentHelper) IsLastMachineDeployment(ctx context.Context, machineDeployment *v1beta20.MachineDeployment, namespace, clusterName string) (bool, error) {
+func (m *MockClientMachineDeploymentHelper) IsLastMachineDeployment(ctx context.Context, machineDeployment *v1beta21.MachineDeployment, namespace, clusterName string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "IsLastMachineDeployment", ctx, machineDeployment, namespace, clusterName)
 	ret0, _ := ret[0].(bool)
@@ -1305,7 +1321,7 @@ func (mr *MockClientMachineDeploymentHelperMockRecorder) IsLastMachineDeployment
 }
 
 // PatchMachineDeployment mocks base method.
-func (m *MockClientMachineDeploymentHelper) PatchMachineDeployment(ctx context.Context, machineDeployment, lastMachineDeployment *v1beta20.MachineDeployment) error {
+func (m *MockClientMachineDeploymentHelper) PatchMachineDeployment(ctx context.Context, machineDeployment, lastMachineDeployment *v1beta21.MachineDeployment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PatchMachineDeployment", ctx, machineDeployment, lastMachineDeployment)
 	ret0, _ := ret[0].(error)
@@ -1343,10 +1359,10 @@ func (m *MockClientMachineSetHelper) EXPECT() *MockClientMachineSetHelperMockRec
 }
 
 // GetMachineSetFromUID mocks base method.
-func (m *MockClientMachineSetHelper) GetMachineSetFromUID(ctx context.Context, namespace string, machineDeploymentUID types.UID) (*v1beta20.MachineSet, error) {
+func (m *MockClientMachineSetHelper) GetMachineSetFromUID(ctx context.Context, namespace string, machineDeploymentUID types.UID) (*v1beta21.MachineSet, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineSetFromUID", ctx, namespace, machineDeploymentUID)
-	ret0, _ := ret[0].(*v1beta20.MachineSet)
+	ret0, _ := ret[0].(*v1beta21.MachineSet)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1358,7 +1374,7 @@ func (mr *MockClientMachineSetHelperMockRecorder) GetMachineSetFromUID(ctx, name
 }
 
 // PatchMachineSet mocks base method.
-func (m *MockClientMachineSetHelper) PatchMachineSet(ctx context.Context, machineSet, lastMachineSet *v1beta20.MachineSet) error {
+func (m *MockClientMachineSetHelper) PatchMachineSet(ctx context.Context, machineSet, lastMachineSet *v1beta21.MachineSet) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PatchMachineSet", ctx, machineSet, lastMachineSet)
 	ret0, _ := ret[0].(error)
@@ -1467,7 +1483,7 @@ func (m *MockClientDeviceTaintRuleHelper) EXPECT() *MockClientDeviceTaintRuleHel
 }
 
 // CreateDeviceTaintRule mocks base method.
-func (m *MockClientDeviceTaintRuleHelper) CreateDeviceTaintRule(ctx context.Context, deviceTaintRule *v1alpha3.DeviceTaintRule) error {
+func (m *MockClientDeviceTaintRuleHelper) CreateDeviceTaintRule(ctx context.Context, deviceTaintRule *v1beta20.DeviceTaintRule) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateDeviceTaintRule", ctx, deviceTaintRule)
 	ret0, _ := ret[0].(error)
@@ -1481,18 +1497,57 @@ func (mr *MockClientDeviceTaintRuleHelperMockRecorder) CreateDeviceTaintRule(ctx
 }
 
 // ListDeviceTaintRule mocks base method.
-func (m *MockClientDeviceTaintRuleHelper) ListDeviceTaintRule(ctx context.Context, namespace string) (*v1alpha3.DeviceTaintRuleList, error) {
+func (m *MockClientDeviceTaintRuleHelper) ListDeviceTaintRule(ctx context.Context) (*v1beta20.DeviceTaintRuleList, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListDeviceTaintRule", ctx, namespace)
-	ret0, _ := ret[0].(*v1alpha3.DeviceTaintRuleList)
+	ret := m.ctrl.Call(m, "ListDeviceTaintRule", ctx)
+	ret0, _ := ret[0].(*v1beta20.DeviceTaintRuleList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListDeviceTaintRule indicates an expected call of ListDeviceTaintRule.
-func (mr *MockClientDeviceTaintRuleHelperMockRecorder) ListDeviceTaintRule(ctx, namespace any) *gomock.Call {
+func (mr *MockClientDeviceTaintRuleHelperMockRecorder) ListDeviceTaintRule(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDeviceTaintRule", reflect.TypeOf((*MockClientDeviceTaintRuleHelper)(nil).ListDeviceTaintRule), ctx, namespace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDeviceTaintRule", reflect.TypeOf((*MockClientDeviceTaintRuleHelper)(nil).ListDeviceTaintRule), ctx)
+}
+
+// MockClientResourceSliceHelper is a mock of ClientResourceSliceHelper interface.
+type MockClientResourceSliceHelper struct {
+	ctrl     *gomock.Controller
+	recorder *MockClientResourceSliceHelperMockRecorder
+	isgomock struct{}
+}
+
+// MockClientResourceSliceHelperMockRecorder is the mock recorder for MockClientResourceSliceHelper.
+type MockClientResourceSliceHelperMockRecorder struct {
+	mock *MockClientResourceSliceHelper
+}
+
+// NewMockClientResourceSliceHelper creates a new mock instance.
+func NewMockClientResourceSliceHelper(ctrl *gomock.Controller) *MockClientResourceSliceHelper {
+	mock := &MockClientResourceSliceHelper{ctrl: ctrl}
+	mock.recorder = &MockClientResourceSliceHelperMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockClientResourceSliceHelper) EXPECT() *MockClientResourceSliceHelperMockRecorder {
+	return m.recorder
+}
+
+// ListResourceSlice mocks base method.
+func (m *MockClientResourceSliceHelper) ListResourceSlice(ctx context.Context) (*v10.ResourceSliceList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListResourceSlice", ctx)
+	ret0, _ := ret[0].(*v10.ResourceSliceList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListResourceSlice indicates an expected call of ListResourceSlice.
+func (mr *MockClientResourceSliceHelperMockRecorder) ListResourceSlice(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListResourceSlice", reflect.TypeOf((*MockClientResourceSliceHelper)(nil).ListResourceSlice), ctx)
 }
 
 // MockClientLogicalServerHelper is a mock of ClientLogicalServerHelper interface.
@@ -1520,10 +1575,10 @@ func (m *MockClientLogicalServerHelper) EXPECT() *MockClientLogicalServerHelperM
 }
 
 // GetLogicalServer mocks base method.
-func (m *MockClientLogicalServerHelper) GetLogicalServer(ctx context.Context, name, namespace string) (*v10.LogicalServer, error) {
+func (m *MockClientLogicalServerHelper) GetLogicalServer(ctx context.Context, name, namespace string) (*v11.LogicalServer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogicalServer", ctx, name, namespace)
-	ret0, _ := ret[0].(*v10.LogicalServer)
+	ret0, _ := ret[0].(*v11.LogicalServer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1535,10 +1590,10 @@ func (mr *MockClientLogicalServerHelperMockRecorder) GetLogicalServer(ctx, name,
 }
 
 // GetLogicalServerFromDCIMachine mocks base method.
-func (m *MockClientLogicalServerHelper) GetLogicalServerFromDCIMachine(ctx context.Context, dciMachine *v1beta2.DCIMachine) (*v10.LogicalServer, error) {
+func (m *MockClientLogicalServerHelper) GetLogicalServerFromDCIMachine(ctx context.Context, dciMachine *v1beta2.DCIMachine) (*v11.LogicalServer, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetLogicalServerFromDCIMachine", ctx, dciMachine)
-	ret0, _ := ret[0].(*v10.LogicalServer)
+	ret0, _ := ret[0].(*v11.LogicalServer)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1590,7 +1645,7 @@ func (m *MockClientMachineAlertHelper) EXPECT() *MockClientMachineAlertHelperMoc
 }
 
 // CreateMachineAlert mocks base method.
-func (m *MockClientMachineAlertHelper) CreateMachineAlert(ctx context.Context, machineAlert *v10.MachineAlert) error {
+func (m *MockClientMachineAlertHelper) CreateMachineAlert(ctx context.Context, machineAlert *v11.MachineAlert) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateMachineAlert", ctx, machineAlert)
 	ret0, _ := ret[0].(error)
@@ -1604,7 +1659,7 @@ func (mr *MockClientMachineAlertHelperMockRecorder) CreateMachineAlert(ctx, mach
 }
 
 // DeleteMachineAlert mocks base method.
-func (m *MockClientMachineAlertHelper) DeleteMachineAlert(ctx context.Context, machineAlert *v10.MachineAlert) error {
+func (m *MockClientMachineAlertHelper) DeleteMachineAlert(ctx context.Context, machineAlert *v11.MachineAlert) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteMachineAlert", ctx, machineAlert)
 	ret0, _ := ret[0].(error)
@@ -1618,10 +1673,10 @@ func (mr *MockClientMachineAlertHelperMockRecorder) DeleteMachineAlert(ctx, mach
 }
 
 // GetMachineAlert mocks base method.
-func (m *MockClientMachineAlertHelper) GetMachineAlert(ctx context.Context, name, namespace string) (*v10.MachineAlert, error) {
+func (m *MockClientMachineAlertHelper) GetMachineAlert(ctx context.Context, name, namespace string) (*v11.MachineAlert, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetMachineAlert", ctx, name, namespace)
-	ret0, _ := ret[0].(*v10.MachineAlert)
+	ret0, _ := ret[0].(*v11.MachineAlert)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1633,10 +1688,10 @@ func (mr *MockClientMachineAlertHelperMockRecorder) GetMachineAlert(ctx, name, n
 }
 
 // ListMachineAlert mocks base method.
-func (m *MockClientMachineAlertHelper) ListMachineAlert(ctx context.Context, namespace string) (*v10.MachineAlertList, error) {
+func (m *MockClientMachineAlertHelper) ListMachineAlert(ctx context.Context, namespace string) (*v11.MachineAlertList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListMachineAlert", ctx, namespace)
-	ret0, _ := ret[0].(*v10.MachineAlertList)
+	ret0, _ := ret[0].(*v11.MachineAlertList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

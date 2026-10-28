@@ -1,24 +1,10 @@
-// Copyright 2026 NTT, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package utils
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
+	resourcev1 "k8s.io/api/resource/v1beta2"
 	capiv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	capdv1 "cluster-api-provider-dci/api/v1beta2"
@@ -309,6 +295,60 @@ func TestUtils_HasAnyUUIDsInLogicalServer(t *testing.T) {
 	}
 }
 
+// TestUtils_IsSameDeviceTaintSelector is a function using testing module
+// Target function : IsSameDeviceTaintSelector()
+func TestUtils_IsSameDeviceTaintSelector(t *testing.T) {
+	t.Log("Start TestUtils_IsSameDeviceTaintSelector")
+
+	// test cases
+	tests := []struct {
+		caseName        string                          // test case name
+		caseDescription string                          // test case description
+		inputSelector1  *resourcev1.DeviceTaintSelector // input DeviceTaintSelector object 1
+		inputSelector2  *resourcev1.DeviceTaintSelector // input DeviceTaintSelector object 2
+		expectedResult  bool                            // expected result
+	}{
+		{
+			"selector1/nil,selector2/nil",
+			"should return true when both DeviceTaintSelector objects are nil",
+			nil,
+			nil,
+			true,
+		},
+		{
+			"selector1/non-nil,selector2/nil",
+			"should return false when the first DeviceTaintSelector object is non-nil and the second is nil",
+			&resourcev1.DeviceTaintSelector{},
+			nil,
+			false,
+		},
+		{
+			"selector1/nil,selector2/non-nil",
+			"should return false when the first DeviceTaintSelector object is nil and the second is non-nil",
+			nil,
+			&resourcev1.DeviceTaintSelector{},
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.caseName, func(t *testing.T) {
+			t.Log(tt.caseDescription)
+
+			// call target function
+			result := IsSameDeviceTaintSelector(tt.inputSelector1, tt.inputSelector2)
+
+			if result != tt.expectedResult {
+				// unexpected result
+				t.Errorf("got '%v', but expected result '%v'", result, tt.expectedResult)
+			} else {
+				// expected result
+				t.Logf("got '%v'", result)
+			}
+		})
+	}
+}
+
 // TestUtils_NewDCIMachineTemplateFromCardScalingRequest is a function using testing module
 // Target function : NewDCIMachineTemplateFromCardScalingRequest()
 func TestUtils_NewDCIMachineTemplateFromCardScalingRequest(t *testing.T) {
@@ -433,6 +473,53 @@ func TestUtils_NewDockerMachineTemplateFromNodeScalingRequest(t *testing.T) {
 	}
 }
 
+// TestUtils_NewMachineDeploymentFromCardScalingRequest is a function using testing module
+// Target function : NewMachineDeploymentFromCardScalingRequest()
+func TestUtils_NewMachineDeploymentFromCardScalingRequest(t *testing.T) {
+	t.Log("Start TestUtils_NewMachineDeploymentFromCardScalingRequest")
+
+	// test cases
+	tests := []struct {
+		caseName               string                      // test case name
+		caseDescription        string                      // test case description
+		inputCsr               *scalev1.CardScalingRequest // input csr object
+		inputMachineDeployment *capiv1.MachineDeployment   // input MachineDeployment object
+		expectedErrorMsg       string                      // expected error messages
+	}{
+		{
+			"failure/invalidParameter/CardScalingRequest/nil",
+			"error happened in create new resource when CardScalingRequest is nil",
+			nil,
+			nil,
+			"expected CardScalingRequest and its NewDCIMachineInfo are not nil, but got nil",
+		},
+		{
+			"failure/invalidParameter/CardScalingRequest/Status/NewDCIMachineInfo/nil",
+			"error happened in create new resource when CardScalingRequest's NewDCIMachineInfo is nil",
+			&scalev1.CardScalingRequest{},
+			nil,
+			"expected CardScalingRequest and its NewDCIMachineInfo are not nil, but got nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.caseName, func(t *testing.T) {
+			t.Log(tt.caseDescription)
+
+			// call target function
+			_, result := NewMachineDeploymentFromCardScalingRequest(tt.inputCsr, tt.inputMachineDeployment)
+
+			if !strings.Contains(result.Error(), tt.expectedErrorMsg) {
+				// unexpected result
+				t.Errorf("got '%v', but expected result '%v'", result, tt.expectedErrorMsg)
+			} else {
+				// expected result
+				t.Logf("got '%v'", result)
+			}
+		})
+	}
+}
+
 // TestUtils_NewMachineDeploymentFromNodeScalingRequest is a function using testing module
 // Target function : NewMachineDeploymentFromNodeScalingRequest()
 func TestUtils_NewMachineDeploymentFromNodeScalingRequest(t *testing.T) {
@@ -457,8 +544,7 @@ func TestUtils_NewMachineDeploymentFromNodeScalingRequest(t *testing.T) {
 			"D.C. machine template name",
 			nil,
 			nil,
-			fmt.Sprintf("expected NodeScalingRequest(%p), MachineDeployment(%p) and its parameters are not nil, but got nil",
-				(*scalev1.NodeScalingRequest)(nil), (*capiv1.MachineDeployment)(nil)),
+			"expected NodeScalingRequest is not nil, but got nil",
 		},
 	}
 

@@ -1,0 +1,3485 @@
+package controller
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+
+	discoveryv1 "k8s.io/api/discovery/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+func pod_controller_Test17_1(writer bytes.Buffer, reconciler PodReconciler) { //nolint:gocyclo
+	var err error
+	ctx := context.Background()
+	// ------------------------------
+	//	Test17_1 In/Out Merge
+	//  X-A X-Y (A=Replicas 1to2)
+	//  Y-C
+	//  In-X,Out-Y
+	// ------------------------------
+	fmt.Println(">>>>>")
+	fmt.Println(">>>>> pod_controller_Test17_test.go")
+	fmt.Println(">>>>> Start Test17_1")
+	fmt.Println(">>>>>")
+
+	// Create Deployment
+	pstDeploymentCR := Deployment01FromX.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01FromXLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01FromX")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToA.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToALabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToC.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToCLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToY.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToYLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR := ReplicaSet01FromX
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01FromX")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToA
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToC
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToY
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create HostDeviceNetwork
+	stHostDeviceNetworkCR := HostDeviceNetwork01
+	err = k8sClient.Create(ctx, &stHostDeviceNetworkCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing HostDeviceNetwork01")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR := Pod01FromX1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01FromXLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01FromX1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	var stPodCR corev1.Pod
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToA1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToALabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToA1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod Add Test
+	pstPodCR = Pod01ToA2.DeepCopy()
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToA2")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA2.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToC1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToCLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToC1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToY1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToYLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToY1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create DCIAppConnectionCR
+	pstDCIAppConnectionCR := DCIAppConnection26.DeepCopy()
+	pstDCIAppConnectionCR.Status = DCIAppConnection26Status
+	controllerutil.AddFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Create(ctx, pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing DCIAppConnection01")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService := Service01ToA
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService = Service01ToC
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService = Service01ToY
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice := EndpointSlice01ToA2None
+	stEndpointSlice.Labels = EndpointSlice01ToALabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice = EndpointSlice01ToC
+	stEndpointSlice.Labels = EndpointSlice01ToCLabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice = EndpointSlice01ToY
+	stEndpointSlice.Labels = EndpointSlice01ToYLabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ConnectEndpointFromX1
+	stConnectEndpointCR := ConnectEndpoint01FromX1
+	err = k8sClient.Create(ctx, &stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ConnectEndpointFromX1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ConnectEndpointToY
+	stConnectEndpointCR = ConnectEndpoint26ToY1
+	err = k8sClient.Create(ctx, &stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ConnectEndpointFromY1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// ------------------------------
+	//	Test17_1 Reconcile
+	// ------------------------------
+	got, err := reconciler.Reconcile(ctx,
+		ctrl.Request{NamespacedName: types.NamespacedName{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		}})
+	if err != nil {
+		By("Reconcile Error")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(got).To(Equal(ctrl.Result{Requeue: false}))
+	Expect(got).To(Equal(ctrl.Result{RequeueAfter: 0}))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR FromX1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26FromX1.Spec))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR ToY1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26ToY1.Spec))
+
+	var stServiceCR corev1.Service
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToA,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToA.Spec.Ports))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToC,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToC.Spec.Ports))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToY,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToY.Spec.Ports))
+
+	var stEndpointSliceCR discoveryv1.EndpointSlice
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToA,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToA))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToALabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToA.Endpoints))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToC,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToC))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToCLabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToC.Endpoints))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToY,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToY))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToYLabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToY.Endpoints))
+
+	var stDeploymentCR appsv1.Deployment
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameFromX,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR FromX.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR FromX.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR FromX.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToA,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToA.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToC,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToC.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToY,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToY.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameFromX,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR FromX.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR FromX.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToA,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToC,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToY,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDCIAppConnection01Name,
+			Namespace: cDCIAppConnectionNamespace,
+		},
+		pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("Failed to get DCIAppConnectionCR.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DCIAppConnectionCR.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(pstDCIAppConnectionCR.Finalizers).NotTo(BeEmpty())
+	Expect(pstDCIAppConnectionCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+
+	controllerutil.RemoveFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("Failed to update DCIAppConnectionCR.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	fmt.Println(writer.String())
+	fmt.Println("<<<<<")
+	fmt.Println("<<<<< pod_controller_Test17_test.go")
+	fmt.Println("<<<<< End Test17_1 res")
+	fmt.Println("<<<<<")
+}
+
+func pod_controller_Test17_2(writer bytes.Buffer, reconciler PodReconciler) { //nolint:gocyclo
+	var err error
+	ctx := context.Background()
+	// ------------------------------
+	//	Test17_2 In/Out Merge
+	//  X-A X-Y
+	//  Y-C (C=Replicas 1to2)
+	//  In-X,Out-Y
+	// ------------------------------
+	fmt.Println(">>>>>")
+	fmt.Println(">>>>> pod_controller_Test17_test.go")
+	fmt.Println(">>>>> Start Test17_2")
+	fmt.Println(">>>>>")
+
+	// Create Deployment
+	pstDeploymentCR := Deployment01FromX.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01FromXLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01FromX")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToA.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToALabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToC.DeepCopy()
+	pstDeploymentCR.Spec.Replicas = &iReplicas01ToC1to2
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToCLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToY.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToYLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR := ReplicaSet01FromX
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01FromX")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToA
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	pstReplicaSetCR := ReplicaSet01ToC.DeepCopy()
+	pstReplicaSetCR.Spec.Replicas = &iReplicas01ToC1to2
+	err = k8sClient.Create(ctx, pstReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToY
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create HostDeviceNetwork
+	stHostDeviceNetworkCR := HostDeviceNetwork01
+	err = k8sClient.Create(ctx, &stHostDeviceNetworkCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing HostDeviceNetwork01")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR := Pod01FromX1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01FromXLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01FromX1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	var stPodCR corev1.Pod
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToA1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToALabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToA1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod Add Test
+	pstPodCR = Pod01ToA2.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToALabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToA2")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA2.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToC1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToCLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToC1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToC2.DeepCopy()
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToC2")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC2.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToY1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToYLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToY1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create DCIAppConnectionCR
+	pstDCIAppConnectionCR := DCIAppConnection26.DeepCopy()
+	pstDCIAppConnectionCR.Status = DCIAppConnection26Status
+	controllerutil.AddFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Create(ctx, pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing DCIAppConnection01")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService := Service01ToA
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService = Service01ToC
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService = Service01ToY
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice := EndpointSlice01ToA
+	stEndpointSlice.Labels = EndpointSlice01ToALabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice = EndpointSlice01ToC
+	stEndpointSlice.Labels = EndpointSlice01ToCLabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice = EndpointSlice01ToY
+	stEndpointSlice.Labels = EndpointSlice01ToYLabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ConnectEndpointFromX1
+	stConnectEndpointCR := ConnectEndpoint26FromX1
+	err = k8sClient.Create(ctx, &stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ConnectEndpointFromX1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ConnectEndpointToY
+	stConnectEndpointCR = ConnectEndpoint26ToY1
+	err = k8sClient.Create(ctx, &stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ConnectEndpointFromY1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// ------------------------------
+	//	Test17_2 Reconcile
+	// ------------------------------
+	got, err := reconciler.Reconcile(ctx,
+		ctrl.Request{NamespacedName: types.NamespacedName{
+			Name:      cPod01NameToC2,
+			Namespace: cPodNamespace,
+		}})
+	if err != nil {
+		By("Reconcile Error")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(got).To(Equal(ctrl.Result{Requeue: false}))
+	Expect(got).To(Equal(ctrl.Result{RequeueAfter: 0}))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR FromX1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26FromX1.Spec))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR ToY1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26ToY1addC2.Spec))
+
+	var stServiceCR corev1.Service
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToA,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToA.Spec.Ports))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToC,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToC.Spec.Ports))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToY,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToY.Spec.Ports))
+
+	var stEndpointSliceCR discoveryv1.EndpointSlice
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToA,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToA))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToALabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToA.Endpoints))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToC,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToC))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToCLabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToC2Add.Endpoints))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToY,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToY))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToYLabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToY.Endpoints))
+
+	var stDeploymentCR appsv1.Deployment
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameFromX,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR FromX.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR FromX.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR FromX.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToA,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToA.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToC,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToC.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToY,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToY.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameFromX,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR FromX.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR FromX.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToA,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToC,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToY,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDCIAppConnection01Name,
+			Namespace: cDCIAppConnectionNamespace,
+		},
+		pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("Failed to get DCIAppConnectionCR.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DCIAppConnectionCR.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(pstDCIAppConnectionCR.Finalizers).NotTo(BeEmpty())
+	Expect(pstDCIAppConnectionCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+
+	controllerutil.RemoveFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("Failed to update DCIAppConnectionCR.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	fmt.Println(writer.String())
+	fmt.Println("<<<<<")
+	fmt.Println("<<<<< pod_controller_Test17_test.go")
+	fmt.Println("<<<<< End Test17_2 res")
+	fmt.Println("<<<<<")
+}
+
+func pod_controller_Test17_3(writer bytes.Buffer, reconciler PodReconciler) { //nolint:gocyclo
+	var err error
+	ctx := context.Background()
+	// ------------------------------
+	//	Test17_3 Pod Create
+	//  X-A,X-C X-Y (X=Replicas 1to2)
+	//  Y-None
+	//  In-X,Out-Y
+	// ------------------------------
+	fmt.Println(">>>>>")
+	fmt.Println(">>>>> pod_controller_Test17_test.go")
+	fmt.Println(">>>>> Start Test17_3")
+	fmt.Println(">>>>>")
+
+	// Create Deployment
+	pstDeploymentCR := Deployment01FromX.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01FromXLabels
+
+	fmt.Println("Change Reolicas 1to2 DeploymentCR FromX.")
+	pstDeploymentCR.Spec.Replicas = &iReplicas01FromX1to2
+
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01FromX")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToA.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToALabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToC.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToCLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToY.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToYLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR := ReplicaSet01FromX
+
+	fmt.Println("Change Reolicas 1to2 ReplicaSetCR FromX.")
+	stReplicaSetCR.Spec.Replicas = &iReplicas01FromX1to2
+
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01FromX")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToA
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToC
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToY
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create HostDeviceNetwork
+	stHostDeviceNetworkCR := HostDeviceNetwork01
+	err = k8sClient.Create(ctx, &stHostDeviceNetworkCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing HostDeviceNetwork01")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR := Pod01FromX1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01FromXLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01FromX1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	var stPodCR corev1.Pod
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod Add Test
+	pstPodCR = Pod01FromX2.DeepCopy()
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01FromX2")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX2.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToA1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToALabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToA1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod Add Test
+	pstPodCR = Pod01ToA2.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToALabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToA2")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA2.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToC1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToCLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToC1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToY1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToYLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToY1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create DCIAppConnectionCR
+	pstDCIAppConnectionCR := DCIAppConnection26.DeepCopy()
+	pstDCIAppConnectionCR.Status = DCIAppConnection26Status
+	controllerutil.AddFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Create(ctx, pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing DCIAppConnection01")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService := Service01ToA
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService = Service01ToC
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService = Service01ToY
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice := EndpointSlice01ToA
+	stEndpointSlice.Labels = EndpointSlice01ToALabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice = EndpointSlice01ToC
+	stEndpointSlice.Labels = EndpointSlice01ToCLabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice = EndpointSlice01ToY
+	stEndpointSlice.Labels = EndpointSlice01ToYLabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ConnectEndpointFromX1
+	stConnectEndpointCR := ConnectEndpoint26FromX1
+	err = k8sClient.Create(ctx, &stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ConnectEndpointFromX1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ConnectEndpointToY
+	stConnectEndpointCR = ConnectEndpoint26ToY1
+	err = k8sClient.Create(ctx, &stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ConnectEndpointFromY1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// ------------------------------
+	//	Test17_3 Reconcile
+	// ------------------------------
+	got, err := reconciler.Reconcile(ctx,
+		ctrl.Request{NamespacedName: types.NamespacedName{
+			Name:      cPod01NameFromX2,
+			Namespace: cPodNamespace,
+		}})
+	if err != nil {
+		By("Reconcile Error")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(got).To(Equal(ctrl.Result{Requeue: false}))
+	Expect(got).To(Equal(ctrl.Result{RequeueAfter: 0}))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR FromX1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26FromX1.Spec))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX2,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR FromX2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR FromX2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26FromX2.Spec))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR ToY1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26ToY1.Spec))
+
+	var stServiceCR corev1.Service
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToA,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToA.Spec.Ports))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToC,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToC.Spec.Ports))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToY,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToY.Spec.Ports))
+
+	var stEndpointSliceCR discoveryv1.EndpointSlice
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToA,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToA))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToALabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToA.Endpoints))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToC,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToC))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToCLabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToC.Endpoints))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToY,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToY))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToYLabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToY.Endpoints))
+
+	var stDeploymentCR appsv1.Deployment
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameFromX,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR FromX.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR FromX.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR FromX.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToA,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToA.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToC,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToC.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToY,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToY.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameFromX,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR FromX.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR FromX.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToA,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToC,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToY,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDCIAppConnection01Name,
+			Namespace: cDCIAppConnectionNamespace,
+		},
+		pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("Failed to get DCIAppConnectionCR.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DCIAppConnectionCR.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(pstDCIAppConnectionCR.Finalizers).NotTo(BeEmpty())
+	Expect(pstDCIAppConnectionCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+
+	controllerutil.RemoveFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("Failed to update DCIAppConnectionCR.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	fmt.Println(writer.String())
+	fmt.Println("<<<<<")
+	fmt.Println("<<<<< pod_controller_Test17_test.go")
+	fmt.Println("<<<<< End Test17_3")
+	fmt.Println("<<<<<")
+}
+
+func pod_controller_Test17_4(writer bytes.Buffer, reconciler PodReconciler) { //nolint:gocyclo
+	var err error
+	ctx := context.Background()
+	// ------------------------------
+	//	Test17_4 Pod Create
+	//  X-A X-Y (Y=Replicas 1to2)
+	//  Y-C (Y=Replicas 1to2)
+	//  In-X,Out-Y
+	// ------------------------------
+	fmt.Println(">>>>>")
+	fmt.Println(">>>>> pod_controller_Test17_test.go")
+	fmt.Println(">>>>> Start Test17_4")
+	fmt.Println(">>>>>")
+
+	// Create Deployment
+	pstDeploymentCR := Deployment01FromX.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01FromXLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01FromX")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToA.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToALabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToC.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToCLabels
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Deployment
+	pstDeploymentCR = Deployment01ToY.DeepCopy()
+	controllerutil.AddFinalizer(pstDeploymentCR, cDCIAppConnectionFinalizer)
+	pstDeploymentCR.Labels = Deployment01ToYLabels
+
+	fmt.Println("Change Reolicas 1to2 DeploymentCR ToY.")
+	pstDeploymentCR.Spec.Replicas = &iReplicas01ToY1to2
+
+	err = k8sClient.Create(ctx, pstDeploymentCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Deployment01ToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR := ReplicaSet01FromX
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01FromX")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToA
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToC
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ReplicaSet
+	stReplicaSetCR = ReplicaSet01ToY
+
+	fmt.Println("Change Reolicas 1to2 ReplicaSetCR ToY.")
+	stReplicaSetCR.Spec.Replicas = &iReplicas01ToY1to2
+
+	err = k8sClient.Create(ctx, &stReplicaSetCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ReplicaSet01ToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create HostDeviceNetwork
+	stHostDeviceNetworkCR := HostDeviceNetwork01
+	err = k8sClient.Create(ctx, &stHostDeviceNetworkCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing HostDeviceNetwork01")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR := Pod01FromX1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01FromXLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01FromX1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	var stPodCR corev1.Pod
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToA1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToALabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToA1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToA2.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToALabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToA2")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA2.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToC1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToCLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToC1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod
+	pstPodCR = Pod01ToY1.DeepCopy()
+	controllerutil.AddFinalizer(pstPodCR, cDCIAppConnectionFinalizer)
+	pstPodCR.Labels = Pod01ToYLabels
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing Pod01ToY1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY1.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Pod Add Test
+	pstPodCR = Pod01ToY2.DeepCopy()
+	err = k8sClient.Create(ctx, pstPodCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing PodCR ToY2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY2.")
+	}
+	stPodCR.Status.Conditions = PodStatusReady
+	err = k8sClient.Status().Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create DCIAppConnectionCR
+	pstDCIAppConnectionCR := DCIAppConnection26.DeepCopy()
+	pstDCIAppConnectionCR.Status = DCIAppConnection26Status
+	controllerutil.AddFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Create(ctx, pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing DCIAppConnection01")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService := Service01ToA
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService = Service01ToC
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create Service
+	stService = Service01ToY
+	err = k8sClient.Create(ctx, &stService)
+	if err != nil {
+		fmt.Println("There is a problem in createing ServiceToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice := EndpointSlice01ToA
+	stEndpointSlice.Labels = EndpointSlice01ToALabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToA")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice = EndpointSlice01ToC
+	stEndpointSlice.Labels = EndpointSlice01ToCLabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToC")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create EndpointSlice
+	stEndpointSlice = EndpointSlice01ToY
+	stEndpointSlice.Labels = EndpointSlice01ToYLabels
+	err = k8sClient.Create(ctx, &stEndpointSlice)
+	if err != nil {
+		fmt.Println("There is a problem in createing EndpointSliceToY")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ConnectEndpointFromX1
+	stConnectEndpointCR := ConnectEndpoint10FromX1
+	err = k8sClient.Create(ctx, &stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ConnectEndpointFromX1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create ConnectEndpointToY
+	stConnectEndpointCR = ConnectEndpoint26ToY1
+	err = k8sClient.Create(ctx, &stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("There is a problem in createing ConnectEndpointFromY1")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	// ------------------------------
+	//	Test17_4 Reconcile
+	// ------------------------------
+	got, err := reconciler.Reconcile(ctx,
+		ctrl.Request{NamespacedName: types.NamespacedName{
+			Name:      cPod01NameToY2,
+			Namespace: cPodNamespace,
+		}})
+	if err != nil {
+		By("Reconcile Error")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(got).To(Equal(ctrl.Result{Requeue: false}))
+	Expect(got).To(Equal(ctrl.Result{RequeueAfter: 0}))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR FromX1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26FromX1addY2.Spec))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR ToY1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26ToY1.Spec))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY2,
+			Namespace: cConnectEndpointNamespace,
+		},
+		&stConnectEndpointCR)
+	if err != nil {
+		fmt.Println("Failed to get ConnectEndpointCR ToY2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ConnectEndpointCR ToY2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stConnectEndpointCR.Spec).To(Equal(ConnectEndpoint26ToY2.Spec))
+
+	var stServiceCR corev1.Service
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToA,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToA.Spec.Ports))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToC,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToC.Spec.Ports))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cService01NameToY,
+			Namespace: cServiceNamespace,
+		},
+		&stServiceCR)
+	if err != nil {
+		fmt.Println("Failed to get ServiceCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ServiceCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stServiceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cDCIAppConnection01Name))
+	Expect(stServiceCR.Spec.Ports).To(Equal(Service01ToY.Spec.Ports))
+
+	var stEndpointSliceCR discoveryv1.EndpointSlice
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToA,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToA))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToALabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToA.Endpoints))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToC,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToC))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToCLabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToC.Endpoints))
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cEndpointSlice01NameToY,
+			Namespace: cEndpointSliceNamespace,
+		},
+		&stEndpointSliceCR)
+	if err != nil {
+		fmt.Println("Failed to get EndpointSliceCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get EndpointSliceCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences).NotTo(BeEmpty())
+	Expect(stEndpointSliceCR.ObjectMeta.OwnerReferences[0].Name).To(Equal(cService01NameToY))
+	Expect(stEndpointSliceCR.Labels).To(Equal(EndpointSlice01ToYLabels))
+	Expect(stEndpointSliceCR.Endpoints).To(Equal(EndpointSlice01ToY2add.Endpoints))
+
+	var stDeploymentCR appsv1.Deployment
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameFromX,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR FromX.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR FromX.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR FromX.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToA,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToA.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToC,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToC.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDeployment01NameToY,
+			Namespace: cDeploymentNamespace,
+		},
+		&stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to get DeploymentCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DeploymentCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stDeploymentCR.Finalizers).NotTo(BeEmpty())
+	Expect(stDeploymentCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stDeploymentCR.Labels).To(Equal(Deployment01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stDeploymentCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stDeploymentCR)
+	if err != nil {
+		fmt.Println("Failed to update DeploymentCR ToY.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameFromX,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR FromX.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR FromX.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToA,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToA.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToA.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToC,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToC.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToC.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cReplicaSet01NameToY,
+			Namespace: cReplicaSetNamespace,
+		},
+		&stReplicaSetCR)
+	if err != nil {
+		fmt.Println("Failed to get ReplicaSetCR ToY.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get ReplicaSetCR ToY.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stReplicaSetCR.Finalizers).To(BeEmpty())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameFromX1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR FromX1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR FromX1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01FromXLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR FromX1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToA2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToA2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToA2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToALabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToA2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToC1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToC1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToC1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToCLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToC1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY1,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY1.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY1.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY1.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cPod01NameToY2,
+			Namespace: cPodNamespace,
+		},
+		&stPodCR)
+	if err != nil {
+		fmt.Println("Failed to get PodCR ToY2.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get PodCR ToY2.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(stPodCR.Finalizers).NotTo(BeEmpty())
+	Expect(stPodCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+	Expect(stPodCR.Labels).To(Equal(Pod01ToYLabels))
+
+	controllerutil.RemoveFinalizer(&stPodCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, &stPodCR)
+	if err != nil {
+		fmt.Println("Failed to update PodCR ToY2.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	err = k8sClient.Get(ctx,
+		client.ObjectKey{
+			Name:      cDCIAppConnection01Name,
+			Namespace: cDCIAppConnectionNamespace,
+		},
+		pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("Failed to get DCIAppConnectionCR.")
+		fmt.Println(err)
+	} else {
+		fmt.Println("Success to get DCIAppConnectionCR.")
+	}
+	Expect(err).NotTo(HaveOccurred())
+	Expect(pstDCIAppConnectionCR.Finalizers).NotTo(BeEmpty())
+	Expect(pstDCIAppConnectionCR.Finalizers[0]).To(Equal(cDCIAppConnectionFinalizer))
+
+	controllerutil.RemoveFinalizer(pstDCIAppConnectionCR, cDCIAppConnectionFinalizer)
+	err = k8sClient.Update(ctx, pstDCIAppConnectionCR)
+	if err != nil {
+		fmt.Println("Failed to update DCIAppConnectionCR.")
+		fmt.Println(err)
+	}
+	Expect(err).NotTo(HaveOccurred())
+
+	fmt.Println(writer.String())
+	fmt.Println("<<<<<")
+	fmt.Println("<<<<< pod_controller_Test17_test.go")
+	fmt.Println("<<<<< End Test17_4")
+	fmt.Println("<<<<<")
+}

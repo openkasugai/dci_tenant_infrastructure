@@ -87,21 +87,22 @@ cd /path/to/scale-controller
 ```
 
 ### Verified Environments
-- k8s: v1.34.2 (Management Cluster + Workload Cluster)
-- cluster-api: v1.12.0 (v1beta2 contract)
+- k8s: v1.36.1 (Management Cluster + Workload Cluster)
+- cluster-api: v1.14.0 (v1beta2 contract)
 - cert-manager: v1.19.2
 - calico: v3.31.2
 
 ### Version for quick start
 
 Set following shell variables adjusting your environment.
+Set helm_chart_version, controller_img_tag, and receiver_img_tag to the values specified in the Helm chart.
 
 ```sh
 calico_version=v3.31.2
-cluster_api_version=v1.12.0
+cluster_api_version=v1.14.0
 cert_manager_version=v1.19.2
-helm_chart_version=v0.3.0
-controller_img_tag=0.3.0
+helm_chart_version=v0.3.9
+controller_img_tag=0.3.9
 ```
 
 #### Setup of Management Cluster and Workload Cluster
@@ -126,22 +127,22 @@ clusterctl init --infrastructure docker
 kubectl get pod -A
 # expected results:
 # NAMESPACE                           NAME                                                             READY   STATUS    RESTARTS   AGE
-# capd-system                         capd-controller-manager-5697dcf77d-cqx4v                         1/1     Running   0          2m6s
-# capi-kubeadm-bootstrap-system       capi-kubeadm-bootstrap-controller-manager-7976f6bf86-5qh7r       1/1     Running   0          2m8s
-# capi-kubeadm-control-plane-system   capi-kubeadm-control-plane-controller-manager-784ff8d7fd-hwdld   1/1     Running   0          2m7s
-# capi-system                         capi-controller-manager-84546dfc89-tr27t                         1/1     Running   0          2m8s
-# cert-manager                        cert-manager-69fd4bc5fc-d4mzp                                    1/1     Running   0          2m27s
-# cert-manager                        cert-manager-cainjector-85b6d7fc67-9wztl                         1/1     Running   0          2m27s
-# cert-manager                        cert-manager-webhook-cfbc49fc8-4l7p5                             1/1     Running   0          2m27s
-# kube-system                         coredns-66bc5c9577-b2f4w                                         1/1     Running   0          3m10s
-# kube-system                         coredns-66bc5c9577-fj8v9                                         1/1     Running   0          3m10s
-# kube-system                         etcd-my-management-control-plane                                 1/1     Running   0          3m17s
-# kube-system                         kindnet-gpl44                                                    1/1     Running   0          3m11s
-# kube-system                         kube-apiserver-my-management-control-plane                       1/1     Running   0          3m17s
-# kube-system                         kube-controller-manager-my-management-control-plane              1/1     Running   0          3m17s
-# kube-system                         kube-proxy-tgq79                                                 1/1     Running   0          3m11s
-# kube-system                         kube-scheduler-my-management-control-plane                       1/1     Running   0          3m17s
-# local-path-storage                  local-path-provisioner-5c4cdb564f-qtfnl                          1/1     Running   0          3m10s
+# capd-system                         capd-controller-manager-74d4679874-h5c4w                         1/1     Running   0          44s
+# capi-kubeadm-bootstrap-system       capi-kubeadm-bootstrap-controller-manager-79dc4c8d8b-7xtgx       1/1     Running   0          45s
+# capi-kubeadm-control-plane-system   capi-kubeadm-control-plane-controller-manager-54dcbf77cf-kp92z   1/1     Running   0          45s
+# capi-system                         capi-controller-manager-6bc7467f69-sdmbt                         1/1     Running   0          46s
+# cert-manager                        cert-manager-5fbfb59747-p45cl                                    1/1     Running   0          61s
+# cert-manager                        cert-manager-cainjector-679cc8b4d5-9pssj                         1/1     Running   0          61s
+# cert-manager                        cert-manager-webhook-7df4887dcb-ddfmt                            1/1     Running   0          61s
+# kube-system                         coredns-589f44dc88-d5xcj                                         1/1     Running   0          74s
+# kube-system                         coredns-589f44dc88-wblbd                                         1/1     Running   0          74s
+# kube-system                         etcd-my-management-control-plane                                 1/1     Running   0          80s
+# kube-system                         kindnet-9j6jm                                                    1/1     Running   0          74s
+# kube-system                         kube-apiserver-my-management-control-plane                       1/1     Running   0          80s
+# kube-system                         kube-controller-manager-my-management-control-plane              1/1     Running   0          80s
+# kube-system                         kube-proxy-w5ltl                                                 1/1     Running   0          74s
+# kube-system                         kube-scheduler-my-management-control-plane                       1/1     Running   0          80s
+# local-path-storage                  local-path-provisioner-855c7b7774-p9gsx                          1/1     Running   0          74s
 ```
 
 ##### Workload Cluster
@@ -161,12 +162,12 @@ envsubst < example/cluster-api/cluster-class-disabled/simple-cluster.yaml | kube
 # FYI: Cluster will be available after installing calico.
 kubectl get cluster,machine
 # expected results:
-# NAME                                         CLUSTERCLASS   AVAILABLE   CP DESIRED   CP AVAILABLE   CP UP-TO-DATE   W DESIRED   W AVAILABLE   W UP-TO-DATE   PHASE         AGE    VERSION
-# cluster.cluster.x-k8s.io/my-simple-cluster                  False       1            0              1               1           0             1              Provisioned   4m1s   
+# NAME                                         CLUSTERCLASS   AVAILABLE   CP DESIRED   CP AVAILABLE   CP UP-TO-DATE   W DESIRED   W AVAILABLE   W UP-TO-DATE   PHASE         AGE   VERSION
+# cluster.cluster.x-k8s.io/my-simple-cluster                  False       1            0              1               1           0             1              Provisioned   94s   
 
-# NAME                                               CLUSTER             NODE NAME                                   READY   AVAILABLE   UP-TO-DATE   PHASE     AGE     VERSION
-# machine.cluster.x-k8s.io/controlplane-4klb7        my-simple-cluster   my-simple-cluster-controlplane-4klb7        False   False       True         Running   3m59s   v1.34.2
-# machine.cluster.x-k8s.io/worker-md-0-jjzlz-sts28   my-simple-cluster   my-simple-cluster-worker-md-0-jjzlz-sts28   False   False       True         Running   3m45s   v1.34.2
+# NAME                                               CLUSTER             NODE NAME                              FAILURE DOMAIN   READY   AVAILABLE   UP-TO-DATE   PHASE          AGE   VERSION
+# machine.cluster.x-k8s.io/controlplane-wp5fg        my-simple-cluster   my-simple-cluster-controlplane-wp5fg                    False   False       True         Running        88s   v1.36.1
+# machine.cluster.x-k8s.io/worker-md-0-mb2bb-h5jc9   my-simple-cluster                                                           False   False       True         Provisioning   87s   v1.36.1
 
 # Create kubeconfig file for workload cluster and set alias
 clusterctl get kubeconfig ${CLUSTER_NAME} > ${PWD}/${CLUSTER_NAME}.kubeconfig
@@ -178,34 +179,34 @@ kw apply -f https://raw.githubusercontent.com/projectcalico/calico/${calico_vers
 kw get pod -A
 # expected results:
 # NAMESPACE     NAME                                                           READY   STATUS    RESTARTS   AGE
-# kube-system   calico-kube-controllers-5c676f698c-rxhc5                       1/1     Running   0          111s
-# kube-system   calico-node-8d7sv                                              1/1     Running   0          111s
-# kube-system   calico-node-dfzbb                                              1/1     Running   0          111s
-# kube-system   coredns-66bc5c9577-f75g2                                       1/1     Running   0          5m53s
-# kube-system   coredns-66bc5c9577-vfpxv                                       1/1     Running   0          5m53s
-# kube-system   etcd-my-simple-cluster-controlplane-q8s5j                      1/1     Running   0          5m57s
-# kube-system   kube-apiserver-my-simple-cluster-controlplane-q8s5j            1/1     Running   0          5m59s
-# kube-system   kube-controller-manager-my-simple-cluster-controlplane-q8s5j   1/1     Running   0          5m55s
-# kube-system   kube-proxy-7kqdg                                               1/1     Running   0          4m26s
-# kube-system   kube-proxy-r5zft                                               1/1     Running   0          5m53s
-# kube-system   kube-scheduler-my-simple-cluster-controlplane-q8s5j            1/1     Running   0          5m55s
+# kube-system   calico-kube-controllers-5b84fd7749-v89dd                       1/1     Running   0          45s
+# kube-system   calico-node-4x28f                                              1/1     Running   0          45s
+# kube-system   calico-node-tp8xg                                              1/1     Running   0          45s
+# kube-system   coredns-589f44dc88-rsncs                                       1/1     Running   0          115s
+# kube-system   coredns-589f44dc88-zz4x5                                       1/1     Running   0          115s
+# kube-system   etcd-my-simple-cluster-controlplane-wp5fg                      1/1     Running   0          2m
+# kube-system   kube-apiserver-my-simple-cluster-controlplane-wp5fg            1/1     Running   0          2m
+# kube-system   kube-controller-manager-my-simple-cluster-controlplane-wp5fg   1/1     Running   0          2m
+# kube-system   kube-proxy-fnnj9                                               1/1     Running   0          67s
+# kube-system   kube-proxy-z9k4h                                               1/1     Running   0          116s
+# kube-system   kube-scheduler-my-simple-cluster-controlplane-wp5fg            1/1     Running   0          2m
 
 # Verify that desired replicas and ready replicas are both 1
 kubectl get md,dockermachinetemplate
 # expected results:
-# NAME                                             CLUSTER             AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE     AGE    VERSION
-# machinedeployment.cluster.x-k8s.io/worker-md-0   my-simple-cluster   True        1         1         1       1           1            Running   8m1s   v1.34.2
+# NAME                                             CLUSTER             AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE     AGE     VERSION
+# machinedeployment.cluster.x-k8s.io/worker-md-0   my-simple-cluster   True        1         1         1       1           1            Running   4m27s   v1.36.1
 
 # NAME                                                                 AGE
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane   8m1s
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker         8m1s
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane   4m27s
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker         4m27s
 
 # Verify Node resources
 kw get node
 # expected results:
 # NAME                                        STATUS   ROLES           AGE     VERSION
-# my-simple-cluster-controlplane-q8s5j        Ready    control-plane   6m56s   v1.34.2
-# my-simple-cluster-worker-md-0-65g6b-92qqz   Ready    <none>          5m19s   v1.34.2
+# my-simple-cluster-controlplane-wp5fg        Ready    control-plane   3m44s   v1.36.1
+# my-simple-cluster-worker-md-0-mb2bb-h5jc9   Ready    <none>          2m47s   v1.36.1
 ```
 
 #### Deploying the Scale Controller
@@ -228,9 +229,9 @@ helm install scale-controller ${path_to_helm_chart} \
     ${cluster_context} \
     --create-namespace \
     --namespace scale-controller-system \
-    --set controllerManager.container.env.PROVIDER_NAME=Docker \
-    --set controllerManager.container.image.repository=scale-controller \
-    --set controllerManager.container.image.tag=${helm_controller_image_tag} \
+    --set manager.env.PROVIDER_NAME=Docker \
+    --set manager.image.repository=scale-controller \
+    --set manager.image.tag=${helm_controller_image_tag} \
     --set alertReceiver.enable=false \
     --set-file managementKubeconfig=${path_to_management_kubeconfig}
 ```
@@ -257,9 +258,9 @@ helm install scale-controller ${path_to_helm_chart} \
     ${cluster_context} \
     --create-namespace \
     --namespace scale-controller-system \
-    --set controllerManager.container.env.PROVIDER_NAME=Docker \
-    --set controllerManager.container.image.repository=scale-controller \
-    --set controllerManager.container.image.tag=${helm_controller_image_tag} \
+    --set manager.env.PROVIDER_NAME=Docker \
+    --set manager.image.repository=scale-controller \
+    --set manager.image.tag=${helm_controller_image_tag} \
     --set alertReceiver.enable=false \
     --set-file managementKubeconfig=${path_to_management_kubeconfig}
 ```
@@ -317,7 +318,7 @@ kind load docker-image -n ${CLUSTER_NAME} ${IMG}
 Set up authentication credentials for the Scale Controller on the Management Cluster.
 
 ```sh
-kubectl apply -f example/rbac/rbac-in-management-cluster-docker.yaml
+kubectl apply -f example/rbac/docker/rbac-in-management-cluster.yaml 
 ```
 
 Create a kubeconfig from the generated credentials so that the Scale Controller can access the Management Cluster.
@@ -344,10 +345,12 @@ kw apply -f example/nsr/docker/nsr-scaleup-existing-md.yaml
 Wait a while and verify that `nodescalingrequest.status.phase` becomes `Created`.
 
 ```sh
-kw get nsr
+kw get nsr -w
 # expected results:
-NAME                TYPE     PHASE     AGE
-scale-up-existing   create   Created   4m26s
+# NAME                TYPE     PHASE      AGE
+# scale-up-existing   create   Creating   9s
+# scale-up-existing   create   Created    105s
+# ^C
 ```
 
 Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` has increased to 2.
@@ -356,11 +359,11 @@ Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.read
 kubectl get md,dockermachinetemplate
 # expected results:
 # NAME                                             CLUSTER             AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE     AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/worker-md-0   my-simple-cluster   True        2         2         2       2           2            Running   17m   v1.34.2
+# machinedeployment.cluster.x-k8s.io/worker-md-0   my-simple-cluster   True        2         2         2       2           2            Running   10m   v1.36.1
 
 # NAME                                                                 AGE
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane   17m
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker         17m
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane   10m
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker         10m
 ```
 
 Verify that a Node has been added.
@@ -369,9 +372,9 @@ Verify that a Node has been added.
 kw get node
 # expected results:
 # NAME                                        STATUS   ROLES           AGE     VERSION
-# my-simple-cluster-controlplane-q8s5j        Ready    control-plane   16m     v1.34.2
-# my-simple-cluster-worker-md-0-65g6b-92qqz   Ready    <none>          14m     v1.34.2
-# my-simple-cluster-worker-md-0-65g6b-944xx   Ready    <none>          4m30s   v1.34.2
+# my-simple-cluster-controlplane-wp5fg        Ready    control-plane   11m     v1.36.1
+# my-simple-cluster-worker-md-0-mb2bb-h5jc9   Ready    <none>          10m     v1.36.1
+# my-simple-cluster-worker-md-0-mb2bb-hn9pj   Ready    <none>          2m40s   v1.36.1
 ```
 
 Delete the `NodeScalingRequest`.
@@ -385,17 +388,19 @@ kw delete nsr scale-up-existing
 Create a `NodeScalingRequest` specifying the `Node` to be deleted.
 
 ```sh
-export NODE_TO_DELETE="my-simple-cluster-worker-md-0-65g6b-944xx" # Adjust to your environment
+export NODE_TO_DELETE="my-simple-cluster-worker-md-0-mb2bb-hn9pj" # Adjust to your environment
 envsubst < example/nsr/docker/nsr-scaledown.yaml | kw apply -f -
 ```
 
 Wait a while and verify that `nodescalingrequest.status.phase` becomes `Deleted`.
 
 ```sh
-kw get nsr
+kw get nsr -w
 # expected results:
-# NAME         TYPE     PHASE     AGE
-# scale-down   delete   Deleted   9s
+# NAME         TYPE     PHASE      AGE
+# scale-down   delete   Deleting   13s
+# scale-down   delete   Deleted    65s
+# ^C
 ```
 
 Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` has decreased to 1.
@@ -404,11 +409,11 @@ Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.read
 kubectl get md,dockermachinetemplate
 # expected results:
 # NAME                                             CLUSTER             AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE     AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/worker-md-0   my-simple-cluster   True        1         1         1       1           1            Running   20m   v1.34.2
+# machinedeployment.cluster.x-k8s.io/worker-md-0   my-simple-cluster   True        1         1         1       1           1            Running   17m   v1.36.1
 
 # NAME                                                                 AGE
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane   20m
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker         20m
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane   17m
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker         17m
 ```
 
 Verify that a Node has been removed.
@@ -417,8 +422,8 @@ Verify that a Node has been removed.
 kw get node
 # expected results:
 # NAME                                        STATUS   ROLES           AGE   VERSION
-# my-simple-cluster-controlplane-q8s5j        Ready    control-plane   19m   v1.34.2
-# my-simple-cluster-worker-md-0-65g6b-92qqz   Ready    <none>          17m   v1.34.2
+# my-simple-cluster-controlplane-wp5fg        Ready    control-plane   16m   v1.36.1
+# my-simple-cluster-worker-md-0-mb2bb-h5jc9   Ready    <none>          15m   v1.36.1
 ```
 
 Delete the `NodeScalingRequest`.
@@ -438,10 +443,12 @@ kw apply -f example/nsr/docker/nsr-scaleup-new-md.yaml
 Verify that `nodescalingrequest.status.phase` becomes `Created`.
 
 ```sh
-kw get nsr
+kw get nsr -w
 # expected results:
-# NAME              TYPE     PHASE     AGE
-# scale-up-new-md   create   Created   36s
+# NAME              TYPE     PHASE      AGE
+# scale-up-new-md   create   Creating   5s
+# scale-up-new-md   create   Created    76s
+# ^C
 ```
 
 Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` has increased to 1.
@@ -449,14 +456,14 @@ Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.read
 ```sh
 kubectl get md,dockermachinetemplate
 # expected results:
-# NAME                                                 CLUSTER             AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE     AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/worker-md-0       my-simple-cluster   True        1         1         1       1           1            Running   22m   v1.34.2
-# machinedeployment.cluster.x-k8s.io/worker-md-8ggbp   my-simple-cluster   True        1         1         1       1           1            Running   63s   v1.34.2
+# NAME                                                 CLUSTER             AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE     AGE    VERSION
+# machinedeployment.cluster.x-k8s.io/worker-md-0       my-simple-cluster   True        1         1         1       1           1            Running   20m    v1.36.1
+# machinedeployment.cluster.x-k8s.io/worker-md-wdbrt   my-simple-cluster   True        1         1         1       1           1            Running   111s   v1.36.1
 
 # NAME                                                                            AGE
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane              22m
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/new-docker-machine-type   63s
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker                    22m
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane              20m
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/new-docker-machine-type   111s
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker                    20m
 ```
 
 Verify that a Node has been removed.
@@ -464,10 +471,10 @@ Verify that a Node has been removed.
 ```sh
 kw get node
 # expected results:
-# NAME                                            STATUS   ROLES           AGE   VERSION
-# my-simple-cluster-controlplane-q8s5j            Ready    control-plane   20m   v1.34.2
-# my-simple-cluster-worker-md-0-65g6b-92qqz       Ready    <none>          19m   v1.34.2
-# my-simple-cluster-worker-md-8ggbp-rlvd6-rvmt4   Ready    <none>          75s   v1.34.2
+# NAME                                            STATUS   ROLES           AGE    VERSION
+# my-simple-cluster-controlplane-wp5fg            Ready    control-plane   19m    v1.36.1
+# my-simple-cluster-worker-md-0-mb2bb-h5jc9       Ready    <none>          18m    v1.36.1
+# my-simple-cluster-worker-md-wdbrt-jhc7x-66jmg   Ready    <none>          113s   v1.36.1
 ```
 
 Delete the `NodeScalingRequest`.
@@ -489,10 +496,11 @@ envsubst < example/nsr/docker/nsr-scaledown.yaml | kw apply -f -
 Verify that `nodescalingrequest.status.phase` becomes `Deleted`.
 
 ```sh
-kw get nsr
+kw get nsr -w
 # expected results:
 # NAME         TYPE     PHASE     AGE
-# scale-down   delete   Deleted   5s
+# scale-down   delete   Deleted   7s
+# ^C
 ```
 
 Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.readyReplicas` has increased to 1.
@@ -501,11 +509,11 @@ Verify that `machinedeployment.spec.replicas` and `machinedeployment.status.read
 kubectl get md,dockermachinetemplate
 # expected results:
 # NAME                                             CLUSTER             AVAILABLE   DESIRED   CURRENT   READY   AVAILABLE   UP-TO-DATE   PHASE     AGE   VERSION
-# machinedeployment.cluster.x-k8s.io/worker-md-0   my-simple-cluster   True        1         1         1       1           1            Running   23m   v1.34.2
+# machinedeployment.cluster.x-k8s.io/worker-md-0   my-simple-cluster   True        1         1         1       1           1            Running   21m   v1.36.1
 
 # NAME                                                                 AGE
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane   23m
-# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker         23m
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/controlplane   21m
+# dockermachinetemplate.infrastructure.cluster.x-k8s.io/worker         21m
 ```
 
 Verify that a Node has been removed.
@@ -514,8 +522,8 @@ Verify that a Node has been removed.
 kw get node
 # expected results:
 # NAME                                        STATUS   ROLES           AGE   VERSION
-# my-simple-cluster-controlplane-q8s5j        Ready    control-plane   22m   v1.34.2
-# my-simple-cluster-worker-md-0-65g6b-92qqz   Ready    <none>          20m   v1.34.2
+# my-simple-cluster-controlplane-wp5fg        Ready    control-plane   20m   v1.36.1
+# my-simple-cluster-worker-md-0-mb2bb-h5jc9   Ready    <none>          19m   v1.36.1
 ```
 
 Delete the `NodeScalingRequest`.
